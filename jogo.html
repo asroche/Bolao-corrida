@@ -817,9 +817,11 @@ function drawWorld(c,R){
     c.fillStyle='#6b6b6b'; c.fillRect(ppx,GY-150,5,150);
   });
 
+  /* névoa leve: joga o cenário pra trás e destaca a pista */
+  c.fillStyle='rgba(255,246,228,.34)'; c.fillRect(0,0,W,GY);
   /* calçada e rua */
-  c.fillStyle='#d9cdb8'; c.fillRect(0,GY,W,17.5);
-  c.fillStyle='#b9aa8e';
+  c.fillStyle='#ece2cf'; c.fillRect(0,GY,W,17.5);
+  c.fillStyle='#d6c9b0';
   var to=R.worldX%30;
   for(x=-to;x<W;x+=30){c.fillRect(Math.round(x/2.5)*2.5,GY,2.5,17.5)}
   c.fillStyle='#16120e'; c.fillRect(0,GY+17.5,W,5);
@@ -849,13 +851,16 @@ var PLACES=[
   [597,'KD Automóveis','car'],[636,'Galeteria Silva','galeto'],[657,'Eucalipt','rest'],
   [659,'Célio Motos','moto'],[720,'Piratas Pastelaria','burger'],[745,'Rhuanitto','burger'],
   [783,'Win Car','car'],[980,'MKP Motos','moto'],[1120,'Alameda Food Park','food'],
-  [1351,'Estação Veículos','car'],[1536,'JCS Veículos','car']
+  [1351,'Estação Veículos','car'],[1536,'JCS Veículos','car'],
+  [91,'Pet Shop Ugioni','loja'],[208,'Posto Onix','posto'],[900,'Posto Elza Lucchi','posto']
 ];
+/* entradas de ruas do bairro (posição aproximada) */
+var STREETS=[[150,'R. Acácio Santiago'],[420,'R. Lázaro Bartolomeu'],[690,'R. José Olibio Lopes'],[860,'R. Osmar dos Santos'],[1040,'R. Alberto Zluhan'],[1250,'R. Vilma Weiss'],[1450,'R. Ivo Westphal']];
 var GENERIC=['Mercadinho','Farmácia','Padaria','Açaí','Barbearia','Lava-car','Autopeças','Academia','Salão','Pet shop','Lanchonete','Bazar'];
 var SLOTS=(function(){
   var n=Math.ceil(AV_M/SLOT), s=new Array(n), i, j;
-  PLACES.forEach(function(p){
-    var span=p[2]==='food'?2:1;
+  PLACES.concat(STREETS.map(function(r){return [r[0],r[1],'rua']})).forEach(function(p){
+    var span=(p[2]==='food'||p[2]==='posto')?2:1;
     j=Math.min(n-span,Math.floor(p[0]/SLOT));
     while(j<n-span&&(s[j]||(span===2&&s[j+1])))j++;
     s[j]={n:p[0],name:p[1],kind:p[2],span:span};
@@ -873,6 +878,8 @@ function slotH(s,j){
   if(s.kind==='casa')return sn(72+hash(j+7)*20);
   if(s.kind==='car')return sn(96+hash(j+7)*14);
   if(s.kind==='food')return 95;
+  if(s.kind==='posto')return 110;
+  if(s.kind==='rua')return 80;
   return sn(92+hash(j+7)*60);
 }
 /* Percorre as lojas visíveis. fn(slot, j, xCentro, largura) */
@@ -944,6 +951,31 @@ function drawSlot(c,s,j,xc,w){
     for(i=x+10;i<x+w-5;i+=10){if(Math.abs(i-xc)>17)c.fillRect(i,base-15,2.5,15)}
     return;
   }
+  if(s.kind==='rua'){
+    /* rua entrando, sumindo no horizonte */
+    c.fillStyle='#16120e'; c.beginPath(); c.moveTo(x+5,base); c.lineTo(xc-20,base-62.5); c.lineTo(xc+20,base-62.5); c.lineTo(x+w-5,base); c.closePath(); c.fill();
+    c.fillStyle='#55545a'; c.beginPath(); c.moveTo(x+10,base); c.lineTo(xc-17.5,base-60); c.lineTo(xc+17.5,base-60); c.lineTo(x+w-10,base); c.closePath(); c.fill();
+    c.fillStyle='#ffd34d'; for(i=0;i<4;i++){c.fillRect(sn(xc-1.25),sn(base-12.5-i*14),2.5,i<2?7.5:5)}
+    c.fillStyle='#16120e'; c.fillRect(x+12.5,base-77.5,5,77.5);
+    box(c,x+2.5,base-95,w*0.62,22.5,'#1c8a3c');
+    return;
+  }
+  if(s.kind==='posto'){
+    var pc=j%2?'#2f6bff':'#e8431f';
+    /* totem de preços */
+    c.fillStyle='#16120e'; c.fillRect(x+22.5,base-80,7.5,80);
+    box(c,x+5,top,45,57.5,'#fff');
+    c.fillStyle=pc; c.fillRect(x+5,top,45,12.5);
+    /* cobertura */
+    box(c,x+60,top+5,w-65,20,'#f4f4f4');
+    c.fillStyle=pc; c.fillRect(x+60,top+20,w-65,5);
+    c.fillStyle='#16120e'; c.fillRect(x+85,top+27.5,7.5,h-27.5); c.fillRect(x+w-32.5,top+27.5,7.5,h-27.5);
+    /* bombas */
+    for(i=0;i<2;i++){var bx=sn(x+120+i*(w-185)/1);box(c,bx,base-35,17.5,35,pc);c.fillStyle='#b7dcf2';c.fillRect(bx+2.5,base-30,12.5,7.5);c.fillStyle='#16120e';c.fillRect(bx+17.5,base-27.5,5,2.5)}
+    /* conveniência */
+      drawCar(c,sn(xc-15),base+12.5,57.5,CARCOL[Math.floor(hash(j+31)*CARCOL.length)],false);
+    return;
+  }
   if(s.kind==='food'){
     var cols=['#3aa6a0','#e8b13a','#e8431f'], cw=sn((w-30)/3);
     for(i=0;i<3;i++){
@@ -1003,6 +1035,18 @@ function streetLabels(c,R){
   forEachSlot(R,function(s,j,xc,w){
     var base=GY-BASE_OFF, h=slotH(s,j), top=base-h, x=sn(xc-w/2);
     c.textAlign='center';
+    if(s.kind==='rua'){
+      c.textAlign='center';
+      pixText(c,s.name.toUpperCase(),x+2.5+w*0.31,base-83.5,6,'#fff',null,w*0.62-6);
+      return;
+    }
+    if(s.kind==='posto'){
+      pixText(c,s.name.toUpperCase(),x+60+(w-65)/2,top+15,7,'#16120e',null,w-75);
+      pixText(c,'GAS',x+18,top+21,5,'#16120e',null);pixText(c,'6,29',x+38,top+21,5,'#e8431f',null);
+      pixText(c,'ETA',x+18,top+33,5,'#16120e',null);pixText(c,'4,59',x+38,top+33,5,'#e8431f',null);
+      pixText(c,'DIE',x+18,top+45,5,'#16120e',null);pixText(c,'6,09',x+38,top+45,5,'#e8431f',null);
+      return;
+    }
     if(s.name){
       var sy=s.kind==='food'?top+13:top+16.5;
       pixText(c,s.name.toUpperCase(),xc,sy,7,s.kind==='food'?'#ffe066':'#fff4e0',null,w-26);
@@ -1093,7 +1137,7 @@ function spawnNpc(R,initial){
 function updateNpcs(R,dt,px){
   var i,n;
   R.npcT-=dt;
-  if(R.npcT<=0&&R.npcs.length<6){R.npcs.push(spawnNpc(R,false));R.npcT=1.6+Math.random()*2.2}
+  if(R.npcT<=0&&R.npcs.length<4){R.npcs.push(spawnNpc(R,false));R.npcT=1.6+Math.random()*2.2}
   for(i=R.npcs.length-1;i>=0;i--){
     n=R.npcs[i];
     var own=n.own;
@@ -1126,6 +1170,11 @@ function drawStreetLayer(c,R){
   /* calçada de trás */
   c.fillStyle='#cdbfa6'; c.fillRect(0,GY-BASE_OFF,W,BASE_OFF);
   c.fillStyle='#16120e'; c.fillRect(0,GY-BASE_OFF,W,2.5);
+  forEachSlot(R,function(s,j,xc,w){
+    if(s.kind!=='rua')return;
+    c.fillStyle='#55545a'; c.fillRect(sn(xc-w/2+10),GY-BASE_OFF+2.5,sn(w-20),BASE_OFF-2.5);
+    c.fillStyle='#f4f4f4'; for(var zx=sn(xc-w/2+15);zx<xc+w/2-15;zx+=10)c.fillRect(zx,GY-BASE_OFF+5,5,BASE_OFF-7.5);
+  });
   /* carros das concessionárias ficam na frente da calçada de trás */
   forEachSlot(R,function(s,j,xc,w){
     if(s.kind!=='car')return;
@@ -1156,13 +1205,21 @@ function pixText(c,txt,x,y,size,fill,stroke,maxW){
 }
 function drawLabels(c,R){
   c.textAlign='center'; c.textBaseline='middle';
-  streetLabels(c,R);
+  c.globalAlpha=0.72; streetLabels(c,R); c.globalAlpha=1;
   eachPole(R,function(ppx){
     if(ppx>W+40||ppx<-40)return;
     c.fillStyle='#16120e'; c.fillRect(ppx-30,GY-145,67.5,22.5);
     c.fillStyle='#1c8a3c'; c.fillRect(ppx-27.5,GY-142.5,62.5,17.5);
-    pixText(c,'E.LUCCHI',ppx+3.5,GY-133.5,6,'#fff',null,56);
+    c.globalAlpha=0.8; pixText(c,'E.LUCCHI',ppx+3.5,GY-133.5,6,'#fff',null,56); c.globalAlpha=1;
   });
+  /* aviso de obstáculo chegando */
+  for(var oi=0;oi<R.obs.length;oi++){
+    var ob=R.obs[oi]; if(ob.hit||ob.x<W*0.5||ob.x>W+10)continue;
+    var wx=clamp(ob.x+ob.w/2,14,W-14), wy=(ob.type==='buraco'?GY-30:ob.y-18);
+    c.fillStyle='#16120e'; c.beginPath(); c.arc(wx,wy,10,0,Math.PI*2); c.fill();
+    c.fillStyle='#e8431f'; c.beginPath(); c.arc(wx,wy,8,0,Math.PI*2); c.fill();
+    c.textAlign='center'; pixText(c,'!',wx+0.5,wy+0.5,9,'#fff',null);
+  }
   for(var i=0;i<R.fx.length;i++){
     var f=R.fx[i]; if(f.ring)continue;
     c.globalAlpha=clamp(f.life*1.5,0,1);
@@ -1280,6 +1337,7 @@ function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,
 function drawObs(c,o){
   c.save(); c.lineWidth=2.5; c.strokeStyle='#16120e'; c.lineJoin='round';
   var x=o.x, y=o.y, w=o.w, h=o.h, a=o.anim||0;
+  if(o.type!=='buraco'){c.fillStyle='rgba(22,18,14,.35)';c.beginPath();c.ellipse(x+w/2,GY+2.5,w*0.6,4,0,0,Math.PI*2);c.fill()}
   if(o.type==='cone'){
     c.fillStyle='#ff7a1a'; c.beginPath(); c.moveTo(x+w/2,y); c.lineTo(x+w,y+h); c.lineTo(x,y+h); c.closePath(); c.fill(); c.stroke();
     c.fillStyle='#fff'; c.fillRect(x+w*0.3,y+h*0.45,w*0.4,5);
@@ -1316,6 +1374,7 @@ function drawObs(c,o){
 function drawItem(c,o){
   c.save(); c.lineWidth=2.5; c.strokeStyle='#16120e';
   var bob=Math.sin((o.anim||0)*5)*3, x=o.x, y=o.y+bob;
+  c.fillStyle='rgba(255,236,120,.6)'; c.beginPath(); c.arc(x+o.w/2,y+o.h/2,17.5,0,Math.PI*2); c.fill();
   if(o.type==='agua'||o.type==='iso'){
     c.fillStyle=o.type==='agua'?'#8fd3ff':'#9be15d';
     roundRect(c,x+3,y+6,o.w-6,o.h-6,4); c.fill(); c.stroke();

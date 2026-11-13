@@ -168,7 +168,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
             <input id="cOddD" type="number" min="0.1" step="0.1">
           </label>
         </div>
-        <p class="hint">Odds 1,0 significa dobro ou nada: quem ganha recebe o mesmo valor que apostou. Como ele começa sem preparo, "Duvido" é o favorito e paga menos (0,6), enquanto "Confio" paga o dobro (2,0). Ajuste como o grupo combinar.</p>
+        <p class="hint">Odds 1,0 significa dobro ou nada: quem ganha recebe o mesmo valor que apostou. Como ele começa sem preparo e o desafio é difícil, "Confio" paga 3 por 1 (apostou R$10, ganha R$30) e "Duvido" paga só 0,4 por 1 (apostou R$10, ganha R$4). Ajuste como o grupo combinar.</p>
       </section>
 
       <section class="card" aria-labelledby="h-apostar">
@@ -242,26 +242,25 @@ footer{font-size:13px;color:var(--muted);text-align:center}
   }
   function seed(){
     return {
-      cfg:{nome:'Ruan',km:5,min:45,data:defaultDate(),oddC:2,oddD:0.6},
-      bets:[
-        {id:1,nome:'Exemplo: Tia Vera',lado:'confio',valor:20},
-        {id:2,nome:'Exemplo: Primo Léo',lado:'duvido',valor:30},
-        {id:3,nome:'Exemplo: Dona Nete',lado:'duvido',valor:10}
-      ],
-      res:null, nextId:4
+      cfg:{nome:'Ruan',km:5,min:45,data:defaultDate(),oddC:3,oddD:0.4},
+      bets:[],
+      res:null, nextId:1
     };
   }
   var S;
   try{ S=JSON.parse(localStorage.getItem(KEY)); }catch(e){ S=null; }
   if(!S||!S.cfg||!Array.isArray(S.bets)) S=seed();
   if(/cunhado|^juan$/i.test(S.cfg.nome||''))S.cfg.nome='Ruan';
+  /* remove apostas de exemplo de versões antigas e atualiza odds que ainda estavam no padrão antigo */
+  S.bets=S.bets.filter(function(b){return !/^Exemplo:/.test(b.nome)});
+  if(!S.res&&((S.cfg.oddC===2&&S.cfg.oddD===0.6)||(S.cfg.oddC===1&&S.cfg.oddD===1))){S.cfg.oddC=3;S.cfg.oddD=0.4}
   function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
 
   function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
   function fmtT(sec){var m=Math.floor(sec/60),s=Math.round(sec%60);return m+':'+String(s).padStart(2,'0')}
   function odd(lado){return lado==='confio'?S.cfg.oddC:S.cfg.oddD}
 
-  /* Quanto o corredor paga (+) ou recebe (-) por bilhete, dado o desfecho. */
+  /* Resultado de cada bilhete. netCorredor: positivo = o corredor recebe, negativo = paga. */
   function outcome(b,sucesso){
     var ganhou=(b.lado==='confio')===sucesso;
     return ganhou ? {won:true,val:b.valor*odd(b.lado)} : {won:false,val:b.valor};
@@ -353,8 +352,8 @@ footer{font-size:13px;color:var(--muted);text-align:center}
       var a=netCorredor(true), b=netCorredor(false);
       $('contasSub').textContent='Prévia: o que acontece com o bolso do '+S.cfg.nome+' em cada cenário.';
       box.innerHTML=
-        '<div class="line '+(a>0?'pay':'get')+'"><span>Se '+nome+' conseguir</span><b>'+(a>0?'paga ':'recebe ')+brl.format(Math.abs(a))+'</b></div>'+
-        '<div class="line '+(b>0?'pay':'get')+'"><span>Se '+nome+' falhar</span><b>'+(b>0?'paga ':'recebe ')+brl.format(Math.abs(b))+'</b></div>';
+        '<div class="line '+(a<0?'pay':'get')+'"><span>Se '+nome+' conseguir</span><b>'+(a<0?'paga ':'recebe ')+brl.format(Math.abs(a))+'</b></div>'+
+        '<div class="line '+(b<0?'pay':'get')+'"><span>Se '+nome+' falhar</span><b>'+(b<0?'paga ':'recebe ')+brl.format(Math.abs(b))+'</b></div>';
       return;
     }
     $('contasSub').textContent='Resultado final. Quem deve pra quem.';
@@ -365,7 +364,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
         : '<div class="line get"><span><b>'+esc(bt.nome)+'</b> paga a '+nome+'</span><b>'+brl.format(o.val)+'</b></div>';
     }).join('');
     var n=netCorredor(S.res.sucesso);
-    rows+='<div class="total '+(n>0?'neg':'pos')+'"><span>Saldo do '+nome+'</span><span>'+(n>0?'-':'+')+brl.format(Math.abs(n))+'</span></div>';
+    rows+='<div class="total '+(n<0?'neg':'pos')+'"><span>Saldo do '+nome+'</span><span>'+(n<0?'-':'+')+brl.format(Math.abs(n))+'</span></div>';
     box.innerHTML=rows;
   }
 
@@ -386,10 +385,10 @@ footer{font-size:13px;color:var(--muted);text-align:center}
         L.push(o.won?('- '+c.nome+' paga '+brl.format(o.val)+' a '+b.nome):('- '+b.nome+' paga '+brl.format(o.val)+' a '+c.nome));
       });
       var n=netCorredor(S.res.sucesso);
-      L.push('Saldo do '+c.nome+': '+(n>0?'-':'+')+brl.format(Math.abs(n)));
+      L.push('Saldo do '+c.nome+': '+(n<0?'-':'+')+brl.format(Math.abs(n)));
     }else{
-      L.push('Se conseguir, saldo do '+c.nome+': '+(netCorredor(true)>0?'-':'+')+brl.format(Math.abs(netCorredor(true))));
-      L.push('Se falhar, saldo do '+c.nome+': '+(netCorredor(false)>0?'-':'+')+brl.format(Math.abs(netCorredor(false))));
+      L.push('Se conseguir, saldo do '+c.nome+': '+(netCorredor(true)<0?'-':'+')+brl.format(Math.abs(netCorredor(true))));
+      L.push('Se falhar, saldo do '+c.nome+': '+(netCorredor(false)<0?'-':'+')+brl.format(Math.abs(netCorredor(false))));
     }
     return L.join('\n');
   }
