@@ -297,9 +297,9 @@ footer{font-size:13px;color:var(--muted);text-align:center}
         var cls='', info;
         if(S.res){
           var o=outcome(b,S.res.sucesso); cls=o.won?'win':'lose';
-          info=o.won?'Recebe '+brl.format(o.val):'Paga '+brl.format(o.val);
+          info=o.won?nome+' paga '+brl.format(o.val)+' a '+esc(b.nome):nome+' recebe '+brl.format(o.val)+' de '+esc(b.nome);
         }else{
-          info='Se ele completar: paga '+brl.format(b.valor)+'<br>Se ele falhar: recebe '+brl.format(b.valor);
+          info='Se completar: '+nome+' recebe '+brl.format(b.valor)+'<br>Se falhar: '+nome+' paga '+brl.format(b.valor);
         }
         return '<div class="ticket '+cls+'"><div class="main"><div class="who">'+esc(b.nome)+'</div>'+
           '<span class="pick duvido">🐌 Contra o '+nome+'</span>'+
