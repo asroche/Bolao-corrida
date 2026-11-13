@@ -147,7 +147,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
   <div class="grid">
     <div style="display:flex;flex-direction:column;gap:28px">
       <section class="card" aria-labelledby="h-desafio">
-        <h2 id="h-desafio">1. O desafio<span>Define a meta e as odds. Quem manda aqui é o corredor.</span></h2>
+        <h2 id="h-desafio">1. O desafio<span>A meta que ele tem que cumprir.</span></h2>
         <div class="fields">
           <label class="full">Corredor
             <input id="cNome" type="text" maxlength="30">
@@ -161,26 +161,16 @@ footer{font-size:13px;color:var(--muted);text-align:center}
           <label class="full">Dia da corrida
             <input id="cData" type="date">
           </label>
-          <label>Paga por R$1 em "Confio"
-            <input id="cOddC" type="number" min="0.1" step="0.1">
-          </label>
-          <label>Paga por R$1 em "Duvido"
-            <input id="cOddD" type="number" min="0.1" step="0.1">
-          </label>
         </div>
-        <p class="hint">Odds 1,0 significa dobro ou nada: quem ganha recebe o mesmo valor que apostou. Como ele começa sem preparo e o desafio é difícil, "Confio" paga 3 por 1 (apostou R$10, ganha R$30) e "Duvido" paga só 0,4 por 1 (apostou R$10, ganha R$4). Ajuste como o grupo combinar.</p>
+        <p class="hint">Regra: é todo mundo contra o corredor, valor por valor. Se ele completar, cada um paga a ele o que apostou. Se falhar, ele paga a cada um o mesmo valor.</p>
       </section>
 
       <section class="card" aria-labelledby="h-apostar">
-        <h2 id="h-apostar">2. Fazer aposta<span>Escolha o lado e o valor. Perdeu, pagou.</span></h2>
+        <h2 id="h-apostar">2. Apostar contra ele<span>Coloque seu nome e quanto vale. Perdeu, pagou.</span></h2>
         <form id="betForm" class="fields" autocomplete="off">
           <label class="full">Seu nome
             <input id="bNome" type="text" maxlength="30" placeholder="Ex.: Tio Marcão" required>
           </label>
-          <div class="full sides" role="radiogroup" aria-label="Seu palpite">
-            <label class="side"><input type="radio" name="lado" value="confio" checked><span>🔥 Confio<small id="oddCLabel"></small></span></label>
-            <label class="side duv"><input type="radio" name="lado" value="duvido"><span>🐌 Duvido<small id="oddDLabel"></small></span></label>
-          </div>
           <label class="full">Valor (R$)
             <input id="bValor" type="number" min="1" step="1" value="10" required>
           </label>
@@ -242,7 +232,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
   }
   function seed(){
     return {
-      cfg:{nome:'Ruan',km:5,min:45,data:defaultDate(),oddC:3,oddD:0.4},
+      cfg:{nome:'Ruan',km:5,min:45,data:defaultDate()},
       bets:[],
       res:null, nextId:1
     };
@@ -251,19 +241,16 @@ footer{font-size:13px;color:var(--muted);text-align:center}
   try{ S=JSON.parse(localStorage.getItem(KEY)); }catch(e){ S=null; }
   if(!S||!S.cfg||!Array.isArray(S.bets)) S=seed();
   if(/cunhado|^juan$/i.test(S.cfg.nome||''))S.cfg.nome='Ruan';
-  /* remove apostas de exemplo de versões antigas e atualiza odds que ainda estavam no padrão antigo */
+  /* remove apostas de exemplo de versões antigas */
   S.bets=S.bets.filter(function(b){return !/^Exemplo:/.test(b.nome)});
-  if(!S.res&&((S.cfg.oddC===2&&S.cfg.oddD===0.6)||(S.cfg.oddC===1&&S.cfg.oddD===1))){S.cfg.oddC=3;S.cfg.oddD=0.4}
   function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
 
   function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
   function fmtT(sec){var m=Math.floor(sec/60),s=Math.round(sec%60);return m+':'+String(s).padStart(2,'0')}
-  function odd(lado){return lado==='confio'?S.cfg.oddC:S.cfg.oddD}
-
-  /* Resultado de cada bilhete. netCorredor: positivo = o corredor recebe, negativo = paga. */
+  /* Todo mundo aposta contra o corredor, valor por valor.
+     won = o apostador ganha (o corredor falhou). netCorredor: positivo = o corredor recebe, negativo = paga. */
   function outcome(b,sucesso){
-    var ganhou=(b.lado==='confio')===sucesso;
-    return ganhou ? {won:true,val:b.valor*odd(b.lado)} : {won:false,val:b.valor};
+    return sucesso ? {won:false,val:b.valor} : {won:true,val:b.valor};
   }
   function netCorredor(sucesso){
     return S.bets.reduce(function(t,b){var o=outcome(b,sucesso);return t+(o.won?-o.val:o.val)},0);
@@ -274,12 +261,10 @@ footer{font-size:13px;color:var(--muted);text-align:center}
     S.cfg.km=Math.max(0.5,parseFloat($('cKm').value)||5);
     S.cfg.min=Math.max(1,parseFloat($('cMin').value)||45);
     S.cfg.data=$('cData').value||defaultDate();
-    S.cfg.oddC=Math.max(0.1,parseFloat($('cOddC').value)||1);
-    S.cfg.oddD=Math.max(0.1,parseFloat($('cOddD').value)||1);
   }
   function fillCfg(){
     $('cNome').value=S.cfg.nome; $('cKm').value=S.cfg.km; $('cMin').value=S.cfg.min;
-    $('cData').value=S.cfg.data; $('cOddC').value=S.cfg.oddC; $('cOddD').value=S.cfg.oddD;
+    $('cData').value=S.cfg.data;
   }
 
   function daysLeft(){
@@ -294,18 +279,14 @@ footer{font-size:13px;color:var(--muted);text-align:center}
     var pm=Math.floor(pace), ps=Math.round((pace-pm)*60); if(ps===60){pm++;ps=0}
     var d=daysLeft();
     $('countdown').textContent=S.res?'Prova encerrada':(d>0?'Faltam '+d+(d===1?' dia':' dias'):(d===0?'É hoje!':'Prova já passou, registre o tempo'));
-    $('heroText').innerHTML=nome+' promete correr <b>'+nf.format(c.km)+' km em até '+nf.format(c.min)+' minutos</b> no dia '+c.data.split('-').reverse().join('/')+'. Aposte se ele chega lá ou se fica no meio do caminho.';
-    $('oddCLabel').textContent='paga '+nf.format(c.oddC)+' por 1';
-    $('oddDLabel').textContent='paga '+nf.format(c.oddD)+' por 1';
-
-    var potC=S.bets.filter(function(b){return b.lado==='confio'}).reduce(function(t,b){return t+b.valor},0);
-    var potD=S.bets.filter(function(b){return b.lado==='duvido'}).reduce(function(t,b){return t+b.valor},0);
+    $('heroText').innerHTML=nome+' promete correr <b>'+nf.format(c.km)+' km em até '+nf.format(c.min)+' minutos</b> no dia '+c.data.split('-').reverse().join('/')+'. É todo mundo contra ele: se completar, leva o que cada um apostou. Se falhar, paga a cada um o mesmo valor.';
+    var pot=S.bets.reduce(function(t,b){return t+b.valor},0);
     $('board').innerHTML=
       '<div class="stat hot"><small>Meta</small><b>'+nf.format(c.km)+' km</b></div>'+
       '<div class="stat"><small>Tempo limite</small><b>'+nf.format(c.min)+' min</b></div>'+
       '<div class="stat"><small>Ritmo exigido</small><b>'+pm+':'+String(ps).padStart(2,'0')+'/km</b></div>'+
-      '<div class="stat"><small>Confiam</small><b>'+brl.format(potC)+'</b></div>'+
-      '<div class="stat"><small>Duvidam</small><b>'+brl.format(potD)+'</b></div>';
+      '<div class="stat"><small>Apostadores</small><b>'+S.bets.length+'</b></div>'+
+      '<div class="stat"><small>Em jogo</small><b>'+brl.format(pot)+'</b></div>';
 
     /* bilhetes */
     $('ticketCount').textContent=S.bets.length+(S.bets.length===1?' aposta':' apostas');
@@ -313,17 +294,15 @@ footer{font-size:13px;color:var(--muted);text-align:center}
       $('tickets').innerHTML='<div class="empty">Ninguém apostou ainda. Seja o primeiro e entre na zoeira.</div>';
     }else{
       $('tickets').innerHTML=S.bets.map(function(b){
-        var ganha=outcome(b,true), perde=outcome(b,false);
         var cls='', info;
         if(S.res){
           var o=outcome(b,S.res.sucesso); cls=o.won?'win':'lose';
           info=o.won?'Recebe '+brl.format(o.val):'Paga '+brl.format(o.val);
         }else{
-          var oS=outcome(b,true), oN=outcome(b,false);
-          info='Se conseguir: '+(oS.won?'+':'-')+brl.format(oS.val)+'<br>Se falhar: '+(oN.won?'+':'-')+brl.format(oN.val);
+          info='Se ele completar: paga '+brl.format(b.valor)+'<br>Se ele falhar: recebe '+brl.format(b.valor);
         }
         return '<div class="ticket '+cls+'"><div class="main"><div class="who">'+esc(b.nome)+'</div>'+
-          '<span class="pick '+b.lado+'">'+(b.lado==='confio'?'🔥 Confio':'🐌 Duvido')+'</span>'+
+          '<span class="pick duvido">🐌 Contra o '+nome+'</span>'+
           '<div class="proj">'+info+'</div></div>'+
           '<div class="stub"><div class="amt">'+brl.format(b.valor)+'</div>'+
           (S.res?'':'<button class="del" type="button" data-del="'+b.id+'" aria-label="Remover aposta de '+esc(b.nome)+'">remover</button>')+
@@ -372,10 +351,10 @@ footer{font-size:13px;color:var(--muted);text-align:center}
     var c=S.cfg, L=[];
     L.push('🏃 BOLÃO DA CORRIDA');
     L.push(c.nome+': '+nf.format(c.km)+' km em até '+nf.format(c.min)+' min, dia '+c.data.split('-').reverse().join('/'));
-    L.push('Odds: Confio paga '+nf.format(c.oddC)+' por 1 | Duvido paga '+nf.format(c.oddD)+' por 1');
+    L.push('Todo mundo contra o '+c.nome+', valor por valor.');
     L.push('');
     S.bets.forEach(function(b){
-      L.push('- '+b.nome+': '+(b.lado==='confio'?'CONFIO':'DUVIDO')+' '+brl.format(b.valor));
+      L.push('- '+b.nome+': '+brl.format(b.valor));
     });
     L.push('');
     if(S.res){
@@ -394,7 +373,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
   }
 
   /* eventos */
-  ['cNome','cKm','cMin','cData','cOddC','cOddD'].forEach(function(id){
+  ['cNome','cKm','cMin','cData'].forEach(function(id){
     $(id).addEventListener('input',function(){readCfg();save();render()});
   });
 
@@ -402,9 +381,8 @@ footer{font-size:13px;color:var(--muted);text-align:center}
     e.preventDefault();
     if(S.res){$('copyMsg').textContent='A prova já foi registrada. Clique em "Reabrir apostas" para adicionar mais.';return}
     var nome=$('bNome').value.trim(); var valor=parseFloat($('bValor').value);
-    var lado=document.querySelector('input[name=lado]:checked').value;
     if(!nome||!(valor>0)) return;
-    S.bets.push({id:S.nextId++,nome:nome,lado:lado,valor:valor});
+    S.bets.push({id:S.nextId++,nome:nome,lado:'contra',valor:valor});
     $('bNome').value=''; save(); render(); $('bNome').focus();
   });
 

@@ -1421,9 +1421,9 @@ function showResult(r,s){
   else if(r.reached){st.className='stamp meh';st.textContent='Chegou, mas estourou';}
   else {st.className='stamp no';st.textContent='Não deu!';}
   var txt;
-  if(r.ok)txt=esc(P.nome)+' fechou os 5 km da Elza Lucchi em '+fmtClock(r.t)+'. Quem apostou no "Duvido" vai ter que pagar.';
-  else if(r.reached)txt=esc(P.nome)+' completou os 5 km, mas levou '+fmtClock(r.t)+'. Passou dos 45 minutos.';
-  else txt=esc(P.nome)+' abriu o bico no km '+nf2.format(r.dist)+', com '+fmtClock(r.t)+' de prova.';
+  if(r.ok)txt=esc(P.nome)+' fechou os 5 km da Elza Lucchi em '+fmtClock(r.t)+'. Agora todo mundo que apostou contra ele vai ter que pagar.';
+  else if(r.reached)txt=esc(P.nome)+' completou os 5 km, mas levou '+fmtClock(r.t)+'. Passou dos 45 minutos, então não vale: vai ter que pagar a galera.';
+  else txt=esc(P.nome)+' abriu o bico no km '+nf2.format(r.dist)+', com '+fmtClock(r.t)+' de prova. Vai ter que pagar a galera.';
   if(!r.ok&&P.dia<=DAYS)txt+=' Ainda sobram '+(DAYS-P.dia+1)+' dias de treino.';
   if(!r.ok&&P.dia>DAYS)txt+=' Os 30 dias de treino já acabaram, mas dá pra correr de novo.';
   $('fTxt').innerHTML=txt;
