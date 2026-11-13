@@ -139,7 +139,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
     <span class="tag" id="countdown">Carregando prazo…</span>
     <h1>Bolão da <em>Corrida</em></h1>
     <p id="heroText"></p>
-    <a class="btn red" href="jogo.html" style="align-self:flex-start;text-decoration:none;display:inline-flex">🎮 Jogar: Corre, Juan!</a>
+    <a class="btn red" href="jogo.html" style="align-self:flex-start;text-decoration:none;display:inline-flex">🎮 Jogar: Corre, Ruan!</a>
   </header>
 
   <section class="board" id="board" aria-label="Resumo do desafio"></section>
@@ -242,7 +242,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
   }
   function seed(){
     return {
-      cfg:{nome:'Juan',km:5,min:45,data:defaultDate(),oddC:2,oddD:0.6},
+      cfg:{nome:'Ruan',km:5,min:45,data:defaultDate(),oddC:2,oddD:0.6},
       bets:[
         {id:1,nome:'Exemplo: Tia Vera',lado:'confio',valor:20},
         {id:2,nome:'Exemplo: Primo Léo',lado:'duvido',valor:30},
@@ -254,7 +254,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
   var S;
   try{ S=JSON.parse(localStorage.getItem(KEY)); }catch(e){ S=null; }
   if(!S||!S.cfg||!Array.isArray(S.bets)) S=seed();
-  if(/cunhado/i.test(S.cfg.nome||''))S.cfg.nome='Juan';
+  if(/cunhado|^juan$/i.test(S.cfg.nome||''))S.cfg.nome='Ruan';
   function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
 
   function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -271,7 +271,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
   }
 
   function readCfg(){
-    S.cfg.nome=$('cNome').value.trim()||'Juan';
+    S.cfg.nome=$('cNome').value.trim()||'Ruan';
     S.cfg.km=Math.max(0.5,parseFloat($('cKm').value)||5);
     S.cfg.min=Math.max(1,parseFloat($('cMin').value)||45);
     S.cfg.data=$('cData').value||defaultDate();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Corre, Juan!</title>
+<title>Corre, Ruan!</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%8F%83%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -153,7 +153,7 @@ textarea{width:100%;min-height:130px;background:var(--paper);border:2.5px solid 
 <body>
 <main class="wrap">
   <header class="top">
-    <div class="logo">Corre, <em>Juan!</em></div>
+    <div class="logo">Corre, <em>Ruan!</em></div>
     <a href="./">← Voltar pro Bolão</a>
   </header>
 
@@ -164,7 +164,7 @@ textarea{width:100%;min-height:130px;background:var(--paper);border:2.5px solid 
       <p class="lead">A prova é na Av. Elza Lucchi, na Ponte do Imaruim, em Palhoça. As lojas vão até o nº 1536, então ela tem uns 1,6 km: os 5 km são ida, volta, ida e mais um pedaço. As concessionárias, lanchonetes e o Alameda Food Park aparecem nos números de verdade. Antes, são 30 dias de treino.</p>
       <form id="fPerfil" class="fields" autocomplete="off" novalidate>
         <label class="full" for="pNome">Nome do atleta
-          <input id="pNome" type="text" maxlength="24" placeholder="Ex.: Juan">
+          <input id="pNome" type="text" maxlength="24" placeholder="Ex.: Ruan">
         </label>
         <label for="pPeso">Peso (kg)
           <input id="pPeso" type="number" inputmode="decimal" min="40" max="250" step="0.5" value="95">
@@ -189,6 +189,11 @@ textarea{width:100%;min-height:130px;background:var(--paper);border:2.5px solid 
         <p id="projTxt"></p>
         <div class="meter" aria-hidden="true"><i id="projBar" style="width:0%"></i></div>
         <div class="scale"><span>0 km</span><span>2,5 km</span><span>5 km</span></div>
+      </div>
+      <div class="proj">
+        <p>Preparo físico: <b id="prepTxt"></b></p>
+        <div class="meter" aria-hidden="true"><i id="prepBar" style="width:0%"></i></div>
+        <p class="small" id="prepHint"></p>
       </div>
       <div class="proj">
         <p>Cansaço acumulado: <b id="cansTxt"></b></p>
@@ -295,7 +300,7 @@ function load(){
     if(o&&typeof o.peso==='number'&&typeof o.altura==='number'&&typeof o.folego==='number'&&typeof o.vel==='number'&&typeof o.dia==='number'){
       if(typeof o.cansaco!=='number')o.cansaco=0;
       if(typeof o.pesoAtual!=='number')o.pesoAtual=o.peso;
-      if(!o.nome||/cunhado/i.test(o.nome))o.nome='Juan';
+      if(!o.nome||/cunhado/i.test(o.nome)||/^juan$/i.test(o.nome))o.nome='Ruan';
       return o;
     }
   }catch(e){}
@@ -313,10 +318,20 @@ function weightFactor(){
   return clamp(1+Math.max(0,imc-24)*0.03+Math.max(0,18.5-imc)*0.03,0.95,1.6);
 }
 /* fôlego gasto por minuto de prova, a uma velocidade v (km/h) */
-function drainPerMin(v){return 3.6*weightFactor()*Math.pow(v/6.5,2)}
+function baseStats(){
+  var imc=imcOf(P.peso,P.altura);
+  return {f:clamp(110-Math.max(0,imc-25)*3,70,120), v:clamp(6.3-Math.max(0,imc-25)*0.06,5.4,6.5)};
+}
+/* 0 = sedentário, 1 = treinado. Vem do quanto o fôlego e a velocidade subiram no treino. */
+function prepOf(){
+  var b=baseStats(), f0=typeof P.folego0==='number'?P.folego0:b.f, v0=typeof P.vel0==='number'?P.vel0:b.v;
+  return clamp(((P.folego-f0)/150+(P.vel-v0)/1.6)/2,0,1);
+}
+/* fôlego gasto por minuto de prova; sem preparo o corpo gasta até 25% a mais */
+function drainPerMin(v,prep){return 3.6*weightFactor()*Math.pow(v/6.5,2)*(1+0.25*(1-prep))}
 function raceFolego(){return P.folego*(1-P.cansaco/250)}
 function projection(){
-  var f=raceFolego(), d=drainPerMin(P.vel);
+  var f=raceFolego(), d=drainPerMin(P.vel,prepOf());
   var min=f/d;
   return {km:min*P.vel/60, min5:GOAL_KM/P.vel*60};
 }
@@ -358,7 +373,7 @@ window.addEventListener('orientationchange',function(){setTimeout(function(){che
 function prefillName(){
   try{
     var b=JSON.parse(localStorage.getItem('bolao-corrida-v1'));
-    if(b&&b.cfg&&b.cfg.nome&&!/cunhado/i.test(b.cfg.nome))return String(b.cfg.nome).slice(0,24);
+    if(b&&b.cfg&&b.cfg.nome&&!/cunhado|^juan$/i.test(b.cfg.nome))return String(b.cfg.nome).slice(0,24);
   }catch(e){}
   return '';
 }
@@ -373,7 +388,7 @@ $('pPeso').addEventListener('input',updateImc);
 $('pAlt').addEventListener('input',updateImc);
 $('fPerfil').addEventListener('submit',function(e){
   e.preventDefault();
-  var nome=$('pNome').value.trim()||'Juan';
+  var nome=$('pNome').value.trim()||'Ruan';
   var peso=parseFloat($('pPeso').value), alt=parseFloat($('pAlt').value);
   if(!(peso>=40&&peso<=250)){$('pErr').textContent='O peso precisa ficar entre 40 e 250 kg.';return}
   if(!(alt>=130&&alt<=220)){$('pErr').textContent='A altura precisa ficar entre 130 e 220 cm.';return}
@@ -383,9 +398,11 @@ $('fPerfil').addEventListener('submit',function(e){
     nome:nome, peso:peso, altura:alt, pesoAtual:peso, dia:1, cansaco:0,
     folego:clamp(110-Math.max(0,imc-25)*3,70,120),
     vel:clamp(6.3-Math.max(0,imc-25)*0.06,5.4,6.5),
+    folego0:0, vel0:0,
     log:'Dia 1. '+nome+' tirou o tênis do armário. Bora começar.',
     recorde:null
   };
+  P.folego0=P.folego; P.vel0=P.vel;
   store(); renderTreino(); show('sTreino');
 });
 
@@ -445,6 +462,10 @@ function renderTreino(){
     (reach?'Dá pra fechar os 5 km':'Ainda falta fôlego pros 5 km')+
     '. No ritmo dele, 5 km levam <b>'+fmtClock(pr.min5*60)+'</b> '+(tempoOk?'(dentro dos 45 min).':'(estoura os 45 min).');
   $('projBar').style.width=clamp(km/GOAL_KM*100,0,100)+'%';
+  var pp=prepOf(), ppct=Math.round(pp*100);
+  $('prepTxt').textContent=ppct+'%'+(pp<0.25?' (sedentário)':(pp<0.6?' (pegando o ritmo)':(pp<0.9?' (em forma)':' (atleta)')));
+  $('prepBar').style.width=ppct+'%';
+  $('prepHint').textContent='Na corrida: topada tira '+Math.round(16+10*(1-pp))+' de fôlego, água devolve '+Math.round(4+6*pp)+', isotônico '+Math.round(10+12*pp)+'. Com pouco preparo ele também pula mais baixo e a tosse do cigarro dura mais.';
   var c=Math.round(P.cansaco);
   $('cansTxt').textContent=c+'%'+(c>60?' (treino rende menos, e ele larga com menos fôlego)':(c>30?' (larga com um pouco menos de fôlego)':''));
   $('cansBar').style.width=c+'%';
@@ -565,6 +586,7 @@ var Race={
     this.pl={x:90,y:0,vy:0,w:35,h:55,jumps:0,ground:true,phase:0,inv:0,stumble:0};
     this.pl.y=GY-this.pl.h;
     this.maxF=raceFolego(); this.f=this.maxF;
+    this.prep=prepOf(); this.turboBoost=1.5+this.prep; this.coughDur=3+2*(1-this.prep);
     this.dist=0; this.t=0; this.worldX=0;
     this.obs=[]; this.items=[]; this.fx=[];
     this.nextObs=520; this.nextItem=380;
@@ -600,8 +622,8 @@ var Race={
     if(this.state==='pause'){this.resume();return}
     if(this.state!=='run')return;
     var p=this.pl;
-    if(p.ground){p.vy=-720;p.ground=false;p.jumps=1}
-    else if(p.jumps<2){p.vy=-610;p.jumps=2;this.fx.push({x:p.x+p.w/2,y:p.y+p.h,txt:'',life:0.25,ring:true})}
+    if(p.ground){p.vy=-(625+95*this.prep);p.ground=false;p.jumps=1}
+    else if(p.jumps<2){p.vy=-(505+105*this.prep);p.jumps=2;this.fx.push({x:p.x+p.w/2,y:p.y+p.h,txt:'',life:0.25,ring:true})}
   },
   pause:function(){if(this.state==='run'){this.state='pause';$('btnPause').textContent='Continuar';this.draw()}},
   resume:function(){if(this.state==='pause'){this.state='run';this.last=0;$('btnPause').textContent='Pausar';this.loop()}},
@@ -609,7 +631,7 @@ var Race={
     var v=P.vel;
     if(this.f<this.maxF*0.2)v*=0.85;
     if(this.stumble>0)v*=0.55;
-    if(this.turbo>0)v+=2.5;
+    if(this.turbo>0)v+=this.turboBoost;
     if(this.cough>0)v-=0.6;
     return Math.max(2,v);
   },
@@ -617,14 +639,14 @@ var Race={
     var p=this.pl;
     this.stumble=p.stumble=Math.max(0,p.stumble-dt);
     p.inv=Math.max(0,p.inv-dt);
-    if(this.turbo>0){this.turbo-=dt;if(this.turbo<=0){this.turbo=0;this.cough=3;this.fx.push({x:p.x+20,y:p.y-10,txt:'cof cof!',life:1.2})}}
+    if(this.turbo>0){this.turbo-=dt;if(this.turbo<=0){this.turbo=0;this.cough=this.coughDur;this.fx.push({x:p.x+20,y:p.y-10,txt:'cof cof!',life:1.2})}}
     else if(this.cough>0)this.cough=Math.max(0,this.cough-dt);
     var v=this.speed();
     var px=v*48*dt;
     this.worldX+=px;
     this.t+=dt*TS;
     this.dist+=v/3600*dt*TS;
-    var drain=drainPerMin(v)*(this.cough>0?2.5:1);
+    var drain=drainPerMin(v,this.prep)*(this.cough>0?2.5+0.8*(1-this.prep):1);
     this.f-=drain*dt*TS/60;
     p.phase+=dt*v*1.6;
 
@@ -661,8 +683,9 @@ var Race={
       for(i=0;i<this.obs.length;i++){
         o=this.obs[i]; if(o.hit)continue;
         if(overlap(hb,o.hb())){
-          o.hit=true; this.f-=10; p.stumble=0.8; p.inv=1.3; this.stat.hit++;
+          o.hit=true; var dmg=Math.round(16+10*(1-this.prep)); this.f-=dmg; p.stumble=1.1-0.4*this.prep; p.inv=1.3; this.stat.hit++;
           this.fx.push({x:p.x+p.w/2,y:p.y-6,txt:o.msg,life:1,color:'#e8431f'});
+          this.fx.push({x:p.x+p.w/2,y:p.y-28,txt:'-'+dmg+' fôlego',life:1,color:'#e8431f',small:true});
           break;
         }
       }
@@ -671,9 +694,9 @@ var Race={
       o=this.items[i];
       if(overlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:o.x,y:o.y,w:o.w,h:o.h})){
         this.items.splice(i,1);
-        if(o.type==='agua'){this.f=Math.min(this.maxF,this.f+10);this.stat.agua++;this.fx.push({x:o.x,y:o.y,txt:'+10 fôlego',life:0.9,color:'#2f6bff'})}
-        else if(o.type==='iso'){this.f=Math.min(this.maxF,this.f+22);this.stat.iso++;this.fx.push({x:o.x,y:o.y,txt:'+22 fôlego',life:0.9,color:'#1c8a3c'})}
-        else {this.turbo=3;this.cough=0;this.stat.cig++;this.fx.push({x:o.x,y:o.y,txt:'TURBO!',life:0.9,color:'#e8431f'})}
+        if(o.type==='agua'){var ga=Math.round(4+6*this.prep);this.f=Math.min(this.maxF,this.f+ga);this.stat.agua++;this.fx.push({x:o.x,y:o.y,txt:'+'+ga+' fôlego',life:0.9,color:'#2f6bff'})}
+        else if(o.type==='iso'){var gi=Math.round(10+12*this.prep);this.f=Math.min(this.maxF,this.f+gi);this.stat.iso++;this.fx.push({x:o.x,y:o.y,txt:'+'+gi+' fôlego',life:0.9,color:'#1c8a3c'})}
+        else {this.turbo=2+this.prep;this.cough=0;this.stat.cig++;this.fx.push({x:o.x,y:o.y,txt:'TURBO!',life:0.9,color:'#e8431f'})}
       }
     }
 
@@ -1353,7 +1376,7 @@ function showResult(r,s){
   var best=P.recorde;
   if(!best||r.dist>best.dist||(r.reached&&best.reached&&r.t<best.t)){P.recorde={dist:r.dist,t:r.t,reached:r.reached};store()}
   lastResultText=
-    '🏃 CORRE, JUAN! (Av. Elza Lucchi)\n'+
+    '🏃 CORRE, RUAN! (Av. Elza Lucchi)\n'+
     P.nome+': '+(r.ok?'CONSEGUIU':'NÃO CONSEGUIU')+'\n'+
     'Distância: '+nf2.format(r.dist)+' km em '+fmtClock(r.t)+(r.dist>0?' ('+fmtPace(pace)+')':'')+'\n'+
     'Treinou '+(Math.min(P.dia,DAYS+1)-1)+' dias · Água: '+(s.agua+s.iso)+' · Cigarros: '+s.cig+' · Topadas: '+s.hit;
