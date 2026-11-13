@@ -248,6 +248,7 @@ textarea{width:100%;min-height:130px;background:var(--paper);border:2.5px solid 
       <span>💧 <b>Água</b> devolve fôlego</span>
       <span>🧃 <b>Isotônico</b> devolve mais</span>
       <span>🚬 <b>Cigarro</b> dá turbo, mas depois vem a tosse</span>
+      <span>🍪 <b>Cookies da Paula</b> dão energia, mas depois da corrida engordam</span>
     </div>
   </section>
 
@@ -282,6 +283,8 @@ textarea{width:100%;min-height:130px;background:var(--paper);border:2.5px solid 
 /* ---------- Constantes ---------- */
 var KEY='corre-cunhado-v1';
 var DAYS=30, GOAL_KM=5, LIMIT_MIN=45;
+var COOKIE_F=15, COOKIE_KG=0.4; /* cookie: +fôlego na hora, +kg depois da corrida */
+var MAX_DAYS=365;
 var TS=15;            /* 1 s real = 15 s de prova */
 var AV_KM=1.6;        /* comprimento aproximado da avenida (numeração vai até ~1536) */
 var nf1=new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
@@ -417,7 +420,7 @@ var ACTS={
 var NATURAL_RECOVERY=12;
 
 function canDo(type){
-  if(P.dia>DAYS)return false;
+  if(P.dia>MAX_DAYS)return false;
   var a=ACTS[type];
   if(type==='descanso')return true;
   return P.cansaco+a.c<=100;
@@ -440,7 +443,7 @@ function applyTraining(type,mult){
     msg='Dia '+day+': '+a.nome.toLowerCase()+'. '+q+' Fôlego +'+nf1.format(gf)+', velocidade +'+nf2.format(gv)+' km/h.'+(fm<1?' Cansado, rendeu menos.':'');
   }
   P.dia++;
-  if(P.dia>DAYS)msg+=' Acabaram os 30 dias. Chegou o dia da prova!';
+  if(P.dia===DAYS+1)msg+=' Acabaram os 30 dias da aposta. Dá pra continuar treinando, mas a partir de agora é treino extra e a corrida não vale pra aposta.';
   P.log=msg; store();
   return msg;
 }
@@ -450,7 +453,7 @@ function renderTreino(){
   var done=P.dia>DAYS;
   var imc=imcOf(P.pesoAtual,P.altura);
   $('tStats').innerHTML=
-    '<div class="stat day"><small>Treino</small><b>'+(done?'Concluído':'Dia '+P.dia+'/'+DAYS)+'</b></div>'+
+    '<div class="stat day"><small>'+(done?'Treino extra':'Treino')+'</small><b>'+(done?'Dia '+P.dia+' (fora da aposta)':'Dia '+P.dia+'/'+DAYS)+'</b></div>'+
     '<div class="stat"><small>Fôlego</small><b>'+Math.round(P.folego)+'</b></div>'+
     '<div class="stat"><small>Vel. de cruzeiro</small><b>'+nf1.format(P.vel)+' km/h</b></div>'+
     '<div class="stat"><small>Peso · IMC</small><b>'+nf1.format(P.pesoAtual)+' kg · '+nf1.format(imc)+'</b></div>';
@@ -474,8 +477,8 @@ function renderTreino(){
   $('tLog').textContent=P.log||'';
   var btns=document.querySelectorAll('#acts .act');
   for(var i=0;i<btns.length;i++){btns[i].disabled=Mini.active||!canDo(btns[i].getAttribute('data-act'))}
-  $('btnWeek').disabled=done||Mini.active;
-  $('btnRace').textContent=done?'Ir pra prova':'Ir pra corrida agora';
+  $('btnWeek').disabled=Mini.active||P.dia>MAX_DAYS;
+  $('btnRace').textContent=done?'Correr (treino extra, fora da aposta)':'Ir pra corrida agora';
 }
 
 /* Minijogo de ritmo */
@@ -541,16 +544,17 @@ $('miniTap').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preven
 $('miniBar').addEventListener('pointerdown',function(e){e.preventDefault();Mini.tap()});
 
 $('btnWeek').addEventListener('click',function(){
-  if(Mini.active||P.dia>DAYS)return;
+  if(Mini.active||P.dia>MAX_DAYS)return;
   var plan=['trote','caminhada','descanso','trote','tiro','descanso','trote'];
   var msgs=[];
-  for(var i=0;i<plan.length&&P.dia<=DAYS;i++){
+  var startDay=P.dia;
+  for(var i=0;i<plan.length&&P.dia<=MAX_DAYS;i++){
     var t=plan[i];
     if(!canDo(t))t=canDo('caminhada')?'caminhada':'descanso';
     applyTraining(t,0.92);
     msgs.push(ACTS[t].nome.toLowerCase());
   }
-  P.log='Semana no automático: '+msgs.join(', ')+'.'+(P.dia>DAYS?' Acabaram os 30 dias. Chegou o dia da prova!':'');
+  P.log='Semana no automático: '+msgs.join(', ')+'.'+(startDay<=DAYS&&P.dia>DAYS?' Acabaram os 30 dias da aposta. Dá pra continuar treinando, mas agora é treino extra e a corrida não vale pra aposta.':(P.dia>DAYS+1?' (Treino extra, fora da aposta.)':''));
   store(); renderTreino();
 });
 $('btnRace').addEventListener('click',function(){goFull();Race.prepare();show('sCorrida');Race.begin()});
@@ -592,7 +596,7 @@ var Race={
     this.obs=[]; this.items=[]; this.fx=[];
     this.nextObs=520; this.nextItem=380;
     this.turbo=0; this.cough=0;
-    this.stat={agua:0,iso:0,cig:0,hit:0};
+    this.stat={agua:0,iso:0,cig:0,hit:0,cookie:0};
     this.result=null; this.hudT=0;
     this.npcs=[spawnNpc(this,true),spawnNpc(this,true)]; this.cars=[]; this.npcT=1.5; this.carT=0.4;
   },
@@ -697,6 +701,7 @@ var Race={
         this.items.splice(i,1);
         if(o.type==='agua'){var ga=Math.round(4+6*this.prep);this.f=Math.min(this.maxF,this.f+ga);this.stat.agua++;this.fx.push({x:o.x,y:o.y,txt:'+'+ga+' fôlego',life:0.9,color:'#2f6bff'})}
         else if(o.type==='iso'){var gi=Math.round(10+12*this.prep);this.f=Math.min(this.maxF,this.f+gi);this.stat.iso++;this.fx.push({x:o.x,y:o.y,txt:'+'+gi+' fôlego',life:0.9,color:'#1c8a3c'})}
+        else if(o.type==='cookie'){this.f=Math.min(this.maxF,this.f+COOKIE_F);this.stat.cookie++;this.fx.push({x:o.x,y:o.y,txt:'COOKIES DA PAULA! +'+COOKIE_F,life:1.1,color:'#8a4a1c'})}
         else {this.turbo=2+this.prep;this.cough=0;this.stat.cig++;this.fx.push({x:o.x,y:o.y,txt:'TURBO!',life:0.9,color:'#e8431f'})}
       }
     }
@@ -732,9 +737,9 @@ var Race={
     this.obs.push(o);
   },
   spawnItem:function(){
-    var r=Math.random(), t=r<0.5?'agua':(r<0.82?'cig':'iso');
+    var r=Math.random(), t=r<0.42?'agua':(r<0.66?'cig':(r<0.8?'iso':'cookie'));
     var high=Math.random()<0.45;
-    var o={type:t,w:t==='cig'?30:20,h:t==='cig'?14:30,x:W+40};
+    var o={type:t,w:t==='cig'?30:(t==='cookie'?24:20),h:t==='cig'?14:(t==='cookie'?24:30),x:W+40};
     o.y=high?GY-145:GY-o.h-14;
     for(var i=0;i<this.obs.length;i++){
       if(Math.abs(this.obs[i].x-o.x)<110){o.x=this.obs[i].x+150}
@@ -853,7 +858,7 @@ var PLACES=[
   [659,'Célio Motos','moto'],[720,'Piratas Pastelaria','burger'],[745,'Rhuanitto','burger'],
   [783,'Win Car','car'],[980,'MKP Motos','moto'],[1120,'Alameda Food Park','food'],
   [1351,'Estação Veículos','car'],[1536,'JCS Veículos','car'],
-  [91,'Pet Shop Ugioni','loja'],[208,'Posto Onix','posto'],[900,'Posto Elza Lucchi','posto']
+  [91,'Pet Shop Ugioni','loja'],[300,'Cookies da Paula','outdoor'],[1290,'Cookies da Paula','outdoor'],[208,'Posto Onix','posto'],[900,'Posto Elza Lucchi','posto']
 ];
 /* entradas de ruas do bairro (posição aproximada) */
 var STREETS=[[150,'R. Acácio Santiago'],[420,'R. Lázaro Bartolomeu'],[690,'R. José Olibio Lopes'],[860,'R. Osmar dos Santos'],[1040,'R. Alberto Zluhan'],[1250,'R. Vilma Weiss'],[1450,'R. Ivo Westphal']];
@@ -881,6 +886,7 @@ function slotH(s,j){
   if(s.kind==='food')return 95;
   if(s.kind==='posto')return 110;
   if(s.kind==='rua')return 80;
+  if(s.kind==='outdoor')return 112.5;
   return sn(92+hash(j+7)*60);
 }
 /* Percorre as lojas visíveis. fn(slot, j, xCentro, largura) */
@@ -950,6 +956,16 @@ function drawSlot(c,s,j,xc,w){
     c.fillStyle='#e8e0cf'; c.fillRect(x,base-15,sn(xc-15)-x,15); c.fillRect(sn(xc+15),base-15,x+w-sn(xc+15),15);
     c.fillStyle='#16120e'; c.fillRect(x,base-17.5,w,2.5);
     for(i=x+10;i<x+w-5;i+=10){if(Math.abs(i-xc)>17)c.fillRect(i,base-15,2.5,15)}
+    return;
+  }
+  if(s.kind==='outdoor'){
+    c.fillStyle='#16120e'; c.fillRect(x+25,top+50,7.5,h-50); c.fillRect(x+w-32.5,top+50,7.5,h-50);
+    box(c,x+5,top,w-10,55,'#fff1d6');
+    c.fillStyle='#8a4a1c'; c.fillRect(x+5,top,w-10,5); c.fillRect(x+5,top+50,w-10,5);
+    var kx=sn(x+30), ky=sn(top+27.5);
+    c.fillStyle='#16120e'; c.beginPath(); c.arc(kx,ky,17.5,0,Math.PI*2); c.fill();
+    c.fillStyle='#d9a05b'; c.beginPath(); c.arc(kx,ky,15,0,Math.PI*2); c.fill();
+    c.fillStyle='#4a2810'; c.fillRect(kx-7.5,ky-5,5,5); c.fillRect(kx+2.5,ky-10,5,5); c.fillRect(kx+5,ky+2.5,5,5); c.fillRect(kx-5,ky+5,5,5);
     return;
   }
   if(s.kind==='rua'){
@@ -1036,6 +1052,13 @@ function streetLabels(c,R){
   forEachSlot(R,function(s,j,xc,w){
     var base=GY-BASE_OFF, h=slotH(s,j), top=base-h, x=sn(xc-w/2);
     c.textAlign='center';
+    if(s.kind==='outdoor'){
+      c.textAlign='center';
+      pixText(c,'COOKIES',x+w/2+20,top+17,8,'#8a4a1c',null,w-60);
+      pixText(c,'DA PAULA',x+w/2+20,top+29,8,'#8a4a1c',null,w-60);
+      pixText(c,'ENERGIA PRA CORRER',x+w/2+20,top+42,5,'#16120e',null,w-60);
+      return;
+    }
     if(s.kind==='rua'){
       c.textAlign='center';
       pixText(c,s.name.toUpperCase(),x+2.5+w*0.31,base-83.5,6,'#fff',null,w*0.62-6);
@@ -1376,7 +1399,13 @@ function drawItem(c,o){
   c.save(); c.lineWidth=2.5; c.strokeStyle='#16120e';
   var bob=Math.sin((o.anim||0)*5)*3, x=o.x, y=o.y+bob;
   c.fillStyle='rgba(255,236,120,.6)'; c.beginPath(); c.arc(x+o.w/2,y+o.h/2,17.5,0,Math.PI*2); c.fill();
-  if(o.type==='agua'||o.type==='iso'){
+  if(o.type==='cookie'){
+    var cx=sn(x+o.w/2), cy=sn(y+o.h/2);
+    c.fillStyle='#16120e'; c.beginPath(); c.arc(cx,cy,13,0,Math.PI*2); c.fill();
+    c.fillStyle='#d9a05b'; c.beginPath(); c.arc(cx,cy,10.5,0,Math.PI*2); c.fill();
+    c.fillStyle='#e8bd7f'; c.fillRect(cx-7.5,cy-7.5,5,2.5);
+    c.fillStyle='#4a2810'; c.fillRect(cx-5,cy-2.5,5,5); c.fillRect(cx+2.5,cy-7.5,5,5); c.fillRect(cx+2.5,cy+2.5,5,5); c.fillRect(cx-7.5,cy+5,2.5,2.5);
+  }else if(o.type==='agua'||o.type==='iso'){
     c.fillStyle=o.type==='agua'?'#8fd3ff':'#9be15d';
     roundRect(c,x+3,y+6,o.w-6,o.h-6,4); c.fill(); c.stroke();
     c.fillStyle=o.type==='agua'?'#2f6bff':'#1c8a3c'; c.fillRect(x+6,y,o.w-12,7); c.strokeRect(x+6,y,o.w-12,7);
@@ -1421,27 +1450,34 @@ function showResult(r,s){
   if(r.ok){st.className='stamp ok';st.textContent='Conseguiu!';}
   else if(r.reached){st.className='stamp meh';st.textContent='Chegou, mas estourou';}
   else {st.className='stamp no';st.textContent='Não deu!';}
-  var txt;
-  if(r.ok)txt=esc(P.nome)+' fechou os 5 km da Elza Lucchi em '+fmtClock(r.t)+'. Agora todo mundo que apostou contra ele vai ter que pagar.';
-  else if(r.reached)txt=esc(P.nome)+' completou os 5 km, mas levou '+fmtClock(r.t)+'. Passou dos 45 minutos, então não vale: vai ter que pagar a galera.';
-  else txt=esc(P.nome)+' abriu o bico no km '+nf2.format(r.dist)+', com '+fmtClock(r.t)+' de prova. Vai ter que pagar a galera.';
+  var txt, extra=P.dia>DAYS+1;
+  if(r.ok)txt=esc(P.nome)+' fechou os 5 km da Elza Lucchi em '+fmtClock(r.t)+'.'+(extra?'':' Agora todo mundo que apostou contra ele vai ter que pagar.');
+  else if(r.reached)txt=esc(P.nome)+' completou os 5 km, mas levou '+fmtClock(r.t)+'. Passou dos 45 minutos'+(extra?'.':', então não vale: vai ter que pagar a galera.');
+  else txt=esc(P.nome)+' abriu o bico no km '+nf2.format(r.dist)+', com '+fmtClock(r.t)+' de prova.'+(extra?'':' Vai ter que pagar a galera.');
   if(!r.ok&&P.dia<=DAYS)txt+=' Ainda sobram '+(DAYS-P.dia+1)+' dias de treino.';
-  if(!r.ok&&P.dia>DAYS)txt+=' Os 30 dias de treino já acabaram, mas dá pra correr de novo.';
+  if(extra)txt+=' <b>Treino extra ('+(P.dia-1)+' dias): essa corrida não vale pra aposta.</b>';
+  var kg=0;
+  if(s.cookie>0){
+    kg=Math.round(s.cookie*COOKIE_KG*10)/10;
+    P.pesoAtual=Math.min(250,P.pesoAtual+kg); store();
+    txt+=' Comeu '+s.cookie+(s.cookie===1?' cookie':' cookies')+' da Paula: <b>+'+nf1.format(kg)+' kg</b>. Agora tem que treinar pra queimar o açúcar.';
+  }
   $('fTxt').innerHTML=txt;
   $('fStats').innerHTML=
     '<div class="stat"><small>Distância</small><b>'+nf2.format(r.dist)+' km</b></div>'+
     '<div class="stat"><small>Tempo</small><b>'+fmtClock(r.t)+'</b></div>'+
     '<div class="stat"><small>Ritmo médio</small><b>'+fmtPace(pace)+'</b></div>'+
-    '<div class="stat"><small>Água · Cigarro · Topadas</small><b>'+(s.agua+s.iso)+' · '+s.cig+' · '+s.hit+'</b></div>';
+    '<div class="stat"><small>Água · Cigarro · Cookie · Topadas</small><b>'+(s.agua+s.iso)+' · '+s.cig+' · '+s.cookie+' · '+s.hit+'</b></div>';
   var best=P.recorde;
   if(!best||r.dist>best.dist||(r.reached&&best.reached&&r.t<best.t)){P.recorde={dist:r.dist,t:r.t,reached:r.reached};store()}
   lastResultText=
     '🏃 CORRE, RUAN! (Av. Elza Lucchi)\n'+
     P.nome+': '+(r.ok?'CONSEGUIU':'NÃO CONSEGUIU')+'\n'+
     'Distância: '+nf2.format(r.dist)+' km em '+fmtClock(r.t)+(r.dist>0?' ('+fmtPace(pace)+')':'')+'\n'+
-    'Treinou '+(Math.min(P.dia,DAYS+1)-1)+' dias · Água: '+(s.agua+s.iso)+' · Cigarros: '+s.cig+' · Topadas: '+s.hit;
+    'Treinou '+(P.dia-1)+' dias'+(extra?' (treino extra, NÃO VALE pra aposta)':'')+'\n'+
+    'Água: '+(s.agua+s.iso)+' · Cigarros: '+s.cig+' · Cookies da Paula: '+s.cookie+(kg?' (+'+nf1.format(kg)+' kg)':'')+' · Topadas: '+s.hit;
   $('copyArea').classList.add('hidden'); $('copyMsg').textContent='';
-  $('btnBackTrain').textContent=P.dia<=DAYS?'Voltar pro treino':'Ver o treino';
+  $('btnBackTrain').textContent='Voltar pro treino';
   show('sFim');
 }
 $('btnAgain').addEventListener('click',function(){goFull();Race.prepare();show('sCorrida');Race.begin()});
