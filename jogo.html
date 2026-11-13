@@ -225,6 +225,7 @@ textarea{width:100%;min-height:130px;background:var(--paper);border:2.5px solid 
       </div>
       <p class="small">No automático, cada treino rende como um minijogo mediano. Jogando os minijogos dá pra render mais.</p>
     </div>
+    <div class="row"><button class="btn ghost" type="button" id="btnResetTreino">Refazer a ficha do zero</button></div>
   </section>
 
   <!-- 3. CORRIDA -->
@@ -1451,14 +1452,18 @@ $('btnCopy').addEventListener('click',function(){
   var fail=function(){ta.focus();ta.select();$('copyMsg').textContent='Não consegui copiar sozinho. Selecione o texto acima e copie.'};
   try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(lastResultText).then(ok,fail);else fail()}catch(e){fail()}
 });
-var resetArmed=false;
-$('btnReset').addEventListener('click',function(){
-  var b=$('btnReset');
-  if(!resetArmed){resetArmed=true;b.textContent='Toque de novo pra apagar tudo';setTimeout(function(){resetArmed=false;b.textContent='Refazer a ficha do zero'},3000);return}
-  resetArmed=false; b.textContent='Refazer a ficha do zero';
-  try{localStorage.removeItem(KEY)}catch(e){}
-  P=null; fillPerfil(); show('sPerfil');
-});
+/* Apaga ficha, treino e recorde. Pede dois toques pra não apagar sem querer. */
+function bindReset(id){
+  var armed=false, timer=0, b=$(id);
+  b.addEventListener('click',function(){
+    if(!armed){armed=true;b.textContent='Toque de novo pra apagar tudo';timer=setTimeout(function(){armed=false;b.textContent='Refazer a ficha do zero'},3000);return}
+    clearTimeout(timer); armed=false; b.textContent='Refazer a ficha do zero';
+    Mini.cancel();
+    try{localStorage.removeItem(KEY)}catch(e){}
+    P=null; fillPerfil(); show('sPerfil');
+  });
+}
+bindReset('btnReset'); bindReset('btnResetTreino');
 
 /* ---------- Início ---------- */
 function fillPerfil(){
