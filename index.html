@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bolão da Corrida</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+/* Layout: pista de corrida. Faixa de raias no topo, cartões em forma de bilhete de aposta. */
+:root{
+  --paper:#fff4e0;
+  --ink:#16120e;
+  --track:#e8431f;
+  --lime:#c8f23a;
+  --sky:#2f6bff;
+  --muted:#6e6253;
+  --line:#16120e;
+  --f-display:'Rubik Mono One','Arial Black',sans-serif;
+  --f-body:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  color-scheme: light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;
+  background-image:radial-gradient(rgba(22,18,14,.07) 1px,transparent 1px);background-size:18px 18px}
+h1,h2,h3{margin:0;text-wrap:balance}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+
+.lanes{height:34px;background:repeating-linear-gradient(90deg,var(--track) 0 56px,var(--paper) 56px 64px);border-bottom:3px solid var(--line);position:relative;overflow:hidden}
+.runner{position:absolute;top:2px;font-size:26px;left:-40px;animation:run 9s linear infinite}
+@keyframes run{to{left:105%}}
+@media (prefers-reduced-motion:reduce){.runner{animation:none;left:12px}}
+
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 64px;display:flex;flex-direction:column;gap:28px}
+
+.hero{display:flex;flex-direction:column;gap:14px}
+.hero .tag{align-self:flex-start;background:var(--ink);color:var(--lime);font-weight:800;font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-radius:99px}
+.hero h1{font-family:var(--f-display);font-size:clamp(34px,8vw,72px);line-height:.98;letter-spacing:-.01em}
+.hero h1 em{font-style:normal;background:var(--lime);padding:0 .12em;box-shadow:4px 4px 0 var(--ink);display:inline-block;transform:rotate(-1.5deg)}
+.hero p{margin:0;max-width:60ch;color:var(--muted);font-size:18px}
+
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{background:#fff;border:3px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:5px 5px 0 var(--ink)}
+.stat small{display:block;font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:12px;color:var(--muted)}
+.stat b{display:block;font-family:var(--f-display);font-size:28px;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.stat.hot{background:var(--track);color:#fff}
+.stat.hot small{color:#ffd9cf}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+
+.card{background:#fff;border:3px solid var(--line);border-radius:18px;padding:18px;box-shadow:7px 7px 0 var(--ink);display:flex;flex-direction:column;gap:14px}
+.card h2{font-family:var(--f-display);font-size:20px;text-transform:uppercase}
+.card h2 span{display:block;font-family:var(--f-body);font-weight:600;text-transform:none;font-size:14px;color:var(--muted);margin-top:4px}
+
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fields .full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:5px;font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.05em}
+input,select{background:var(--paper);border:2.5px solid var(--line);border-radius:10px;padding:10px 12px;font-weight:600;width:100%;min-width:0}
+input[type=number]{font-variant-numeric:tabular-nums}
+
+.btn{cursor:pointer;border:3px solid var(--line);border-radius:12px;padding:11px 16px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;background:var(--lime);box-shadow:4px 4px 0 var(--ink);transition:transform .08s,box-shadow .08s}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--ink)}
+.btn:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--ink)}
+.btn.red{background:var(--track);color:#fff}
+.btn.ghost{background:#fff}
+.btn.small{padding:6px 10px;font-size:12px;box-shadow:2px 2px 0 var(--ink)}
+
+.sides{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.side input{position:absolute;opacity:0;pointer-events:none}
+.side span{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;border:3px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;background:var(--paper);font-size:15px;letter-spacing:0;text-transform:none}
+.side span small{font-weight:600;color:var(--muted);font-size:12px}
+.side input:checked + span{background:var(--lime);box-shadow:4px 4px 0 var(--ink)}
+.side.duv input:checked + span{background:var(--track);color:#fff}
+.side.duv input:checked + span small{color:#ffd9cf}
+.side input:focus-visible + span{outline:3px solid var(--sky);outline-offset:2px}
+
+.tickets{display:flex;flex-direction:column;gap:14px}
+.ticket{display:grid;grid-template-columns:1fr auto;border:3px solid var(--line);border-radius:14px;background:var(--paper);position:relative;overflow:hidden}
+.ticket .main{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.ticket .who{font-weight:800;font-size:18px;overflow-wrap:anywhere}
+.ticket .pick{display:inline-flex;align-self:flex-start;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.05em;padding:3px 9px;border-radius:99px;border:2px solid var(--line)}
+.pick.confio{background:var(--lime)}
+.pick.duvido{background:var(--track);color:#fff}
+.ticket .stub{border-left:3px dashed var(--line);padding:12px 14px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:6px;min-width:128px;background:#fff}
+.ticket .stub .amt{font-family:var(--f-display);font-size:20px;font-variant-numeric:tabular-nums}
+.ticket .proj{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ticket.win .stub{background:var(--lime)}
+.ticket.lose .stub{background:#ffd9cf}
+.ticket .del{background:none;border:none;cursor:pointer;font-size:12px;font-weight:800;text-decoration:underline;color:var(--muted);padding:0}
+.empty{border:3px dashed var(--line);border-radius:14px;padding:22px;text-align:center;color:var(--muted);font-weight:600}
+
+.stamp{display:none;font-family:var(--f-display);font-size:clamp(28px,6vw,46px);text-transform:uppercase;border:6px solid;border-radius:14px;padding:6px 16px;transform:rotate(-4deg);align-self:flex-start;background:#fff}
+.stamp.ok{display:inline-block;color:#1c8a3c}
+.stamp.no{display:inline-block;color:var(--track)}
+
+.settle{display:flex;flex-direction:column;gap:10px}
+.line{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border:2.5px solid var(--line);border-radius:10px;background:var(--paper);font-weight:600}
+.line b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.line.pay{background:#ffd9cf}
+.line.get{background:#eaffb0}
+.total{font-family:var(--f-display);font-size:22px;border-top:3px solid var(--line);padding-top:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.total.neg span:last-child{color:var(--track)}
+.total.pos span:last-child{color:#1c8a3c}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+textarea{width:100%;min-height:150px;background:var(--paper);border:2.5px solid var(--line);border-radius:10px;padding:10px;font:600 13px/1.4 ui-monospace,Menlo,monospace}
+.hidden{display:none !important}
+footer{font-size:13px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<div class="lanes" aria-hidden="true"><span class="runner">🏃</span></div>
+
+<main class="wrap">
+  <header class="hero">
+    <span class="tag" id="countdown">Carregando prazo…</span>
+    <h1>Bolão da <em>Corrida</em></h1>
+    <p id="heroText"></p>
+  </header>
+
+  <section class="board" id="board" aria-label="Resumo do desafio"></section>
+
+  <div class="grid">
+    <div style="display:flex;flex-direction:column;gap:28px">
+      <section class="card" aria-labelledby="h-desafio">
+        <h2 id="h-desafio">1. O desafio<span>Define a meta e as odds. Quem manda aqui é o corredor.</span></h2>
+        <div class="fields">
+          <label class="full">Corredor
+            <input id="cNome" type="text" maxlength="30">
+          </label>
+          <label>Distância (km)
+            <input id="cKm" type="number" min="0.5" step="0.5">
+          </label>
+          <label>Tempo limite (min)
+            <input id="cMin" type="number" min="1" step="1">
+          </label>
+          <label class="full">Dia da corrida
+            <input id="cData" type="date">
+          </label>
+          <label>Paga por R$1 em "Confio"
+            <input id="cOddC" type="number" min="0.1" step="0.1">
+          </label>
+          <label>Paga por R$1 em "Duvido"
+            <input id="cOddD" type="number" min="0.1" step="0.1">
+          </label>
+        </div>
+        <p class="hint">Odds 1,0 significa dobro ou nada: quem ganha recebe o mesmo valor que apostou. Como ele começa sem preparo, "Duvido" é o favorito e paga menos (0,6), enquanto "Confio" paga o dobro (2,0). Ajuste como o grupo combinar.</p>
+      </section>
+
+      <section class="card" aria-labelledby="h-apostar">
+        <h2 id="h-apostar">2. Fazer aposta<span>Escolha o lado e o valor. Perdeu, pagou.</span></h2>
+        <form id="betForm" class="fields" autocomplete="off">
+          <label class="full">Seu nome
+            <input id="bNome" type="text" maxlength="30" placeholder="Ex.: Tio Marcão" required>
+          </label>
+          <div class="full sides" role="radiogroup" aria-label="Seu palpite">
+            <label class="side"><input type="radio" name="lado" value="confio" checked><span>🔥 Confio<small id="oddCLabel"></small></span></label>
+            <label class="side duv"><input type="radio" name="lado" value="duvido"><span>🐌 Duvido<small id="oddDLabel"></small></span></label>
+          </div>
+          <label class="full">Valor (R$)
+            <input id="bValor" type="number" min="1" step="1" value="10" required>
+          </label>
+          <div class="full row"><button class="btn" type="submit">Registrar aposta</button></div>
+        </form>
+      </section>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:28px">
+      <section class="card" aria-labelledby="h-bilhetes">
+        <h2 id="h-bilhetes">Bilhetes <span id="ticketCount"></span></h2>
+        <div class="tickets" id="tickets"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-resultado">
+        <h2 id="h-resultado">3. Dia da prova<span>Digite o tempo real e o sistema faz as contas.</span></h2>
+        <div class="fields">
+          <label>Minutos
+            <input id="rMin" type="number" min="0" step="1" placeholder="44">
+          </label>
+          <label>Segundos
+            <input id="rSeg" type="number" min="0" max="59" step="1" placeholder="30">
+          </label>
+        </div>
+        <div class="row">
+          <button class="btn red" id="btnRes" type="button">Registrar tempo</button>
+          <button class="btn ghost" id="btnReset" type="button">Reabrir apostas</button>
+        </div>
+        <div class="stamp" id="stamp"></div>
+        <div id="resumoTempo" class="hint"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-contas">
+        <h2 id="h-contas">Acerto de contas<span id="contasSub"></span></h2>
+        <div class="settle" id="settle"></div>
+        <div class="row">
+          <button class="btn" id="btnCopy" type="button">Copiar resumo</button>
+          <button class="btn ghost" id="btnClear" type="button">Zerar tudo</button>
+        </div>
+        <textarea id="copyArea" class="hidden" readonly aria-label="Resumo para copiar"></textarea>
+        <p class="hint" id="copyMsg"></p>
+      </section>
+    </div>
+  </div>
+
+  <footer>As apostas ficam salvas só neste navegador. Para o grupo todo ver a mesma lista, use "Copiar resumo" e mande no WhatsApp.</footer>
+</main>
+
+<script>
+(function(){
+  var KEY='bolao-corrida-v1';
+  var $=function(id){return document.getElementById(id)};
+  var brl=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+  var nf=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
+
+  function defaultDate(){
+    var d=new Date(); d.setDate(d.getDate()+30);
+    return d.toISOString().slice(0,10);
+  }
+  function seed(){
+    return {
+      cfg:{nome:'Cunhado',km:5,min:45,data:defaultDate(),oddC:2,oddD:0.6},
+      bets:[
+        {id:1,nome:'Exemplo: Tia Vera',lado:'confio',valor:20},
+        {id:2,nome:'Exemplo: Primo Léo',lado:'duvido',valor:30},
+        {id:3,nome:'Exemplo: Dona Nete',lado:'duvido',valor:10}
+      ],
+      res:null, nextId:4
+    };
+  }
+  var S;
+  try{ S=JSON.parse(localStorage.getItem(KEY)); }catch(e){ S=null; }
+  if(!S||!S.cfg||!Array.isArray(S.bets)) S=seed();
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
+
+  function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function fmtT(sec){var m=Math.floor(sec/60),s=Math.round(sec%60);return m+':'+String(s).padStart(2,'0')}
+  function odd(lado){return lado==='confio'?S.cfg.oddC:S.cfg.oddD}
+
+  /* Quanto o corredor paga (+) ou recebe (-) por bilhete, dado o desfecho. */
+  function outcome(b,sucesso){
+    var ganhou=(b.lado==='confio')===sucesso;
+    return ganhou ? {won:true,val:b.valor*odd(b.lado)} : {won:false,val:b.valor};
+  }
+  function netCorredor(sucesso){
+    return S.bets.reduce(function(t,b){var o=outcome(b,sucesso);return t+(o.won?-o.val:o.val)},0);
+  }
+
+  function readCfg(){
+    S.cfg.nome=$('cNome').value.trim()||'Cunhado';
+    S.cfg.km=Math.max(0.5,parseFloat($('cKm').value)||5);
+    S.cfg.min=Math.max(1,parseFloat($('cMin').value)||45);
+    S.cfg.data=$('cData').value||defaultDate();
+    S.cfg.oddC=Math.max(0.1,parseFloat($('cOddC').value)||1);
+    S.cfg.oddD=Math.max(0.1,parseFloat($('cOddD').value)||1);
+  }
+  function fillCfg(){
+    $('cNome').value=S.cfg.nome; $('cKm').value=S.cfg.km; $('cMin').value=S.cfg.min;
+    $('cData').value=S.cfg.data; $('cOddC').value=S.cfg.oddC; $('cOddD').value=S.cfg.oddD;
+  }
+
+  function daysLeft(){
+    var p=S.cfg.data.split('-'); var t=new Date(+p[0],+p[1]-1,+p[2]);
+    var n=new Date(); n=new Date(n.getFullYear(),n.getMonth(),n.getDate());
+    return Math.round((t-n)/86400000);
+  }
+
+  function render(){
+    var c=S.cfg, nome=esc(c.nome);
+    var pace=(c.min/c.km);
+    var pm=Math.floor(pace), ps=Math.round((pace-pm)*60); if(ps===60){pm++;ps=0}
+    var d=daysLeft();
+    $('countdown').textContent=S.res?'Prova encerrada':(d>0?'Faltam '+d+(d===1?' dia':' dias'):(d===0?'É hoje!':'Prova já passou, registre o tempo'));
+    $('heroText').innerHTML=nome+' promete correr <b>'+nf.format(c.km)+' km em até '+nf.format(c.min)+' minutos</b> no dia '+c.data.split('-').reverse().join('/')+'. Aposte se ele chega lá ou se fica no meio do caminho.';
+    $('oddCLabel').textContent='paga '+nf.format(c.oddC)+' por 1';
+    $('oddDLabel').textContent='paga '+nf.format(c.oddD)+' por 1';
+
+    var potC=S.bets.filter(function(b){return b.lado==='confio'}).reduce(function(t,b){return t+b.valor},0);
+    var potD=S.bets.filter(function(b){return b.lado==='duvido'}).reduce(function(t,b){return t+b.valor},0);
+    $('board').innerHTML=
+      '<div class="stat hot"><small>Meta</small><b>'+nf.format(c.km)+' km</b></div>'+
+      '<div class="stat"><small>Tempo limite</small><b>'+nf.format(c.min)+' min</b></div>'+
+      '<div class="stat"><small>Ritmo exigido</small><b>'+pm+':'+String(ps).padStart(2,'0')+'/km</b></div>'+
+      '<div class="stat"><small>Confiam</small><b>'+brl.format(potC)+'</b></div>'+
+      '<div class="stat"><small>Duvidam</small><b>'+brl.format(potD)+'</b></div>';
+
+    /* bilhetes */
+    $('ticketCount').textContent=S.bets.length+(S.bets.length===1?' aposta':' apostas');
+    if(!S.bets.length){
+      $('tickets').innerHTML='<div class="empty">Ninguém apostou ainda. Seja o primeiro e entre na zoeira.</div>';
+    }else{
+      $('tickets').innerHTML=S.bets.map(function(b){
+        var ganha=outcome(b,true), perde=outcome(b,false);
+        var cls='', info;
+        if(S.res){
+          var o=outcome(b,S.res.sucesso); cls=o.won?'win':'lose';
+          info=o.won?'Recebe '+brl.format(o.val):'Paga '+brl.format(o.val);
+        }else{
+          var oS=outcome(b,true), oN=outcome(b,false);
+          info='Se conseguir: '+(oS.won?'+':'-')+brl.format(oS.val)+'<br>Se falhar: '+(oN.won?'+':'-')+brl.format(oN.val);
+        }
+        return '<div class="ticket '+cls+'"><div class="main"><div class="who">'+esc(b.nome)+'</div>'+
+          '<span class="pick '+b.lado+'">'+(b.lado==='confio'?'🔥 Confio':'🐌 Duvido')+'</span>'+
+          '<div class="proj">'+info+'</div></div>'+
+          '<div class="stub"><div class="amt">'+brl.format(b.valor)+'</div>'+
+          (S.res?'':'<button class="del" type="button" data-del="'+b.id+'" aria-label="Remover aposta de '+esc(b.nome)+'">remover</button>')+
+          '</div></div>';
+      }).join('');
+    }
+
+    /* resultado */
+    var st=$('stamp'); st.className='stamp';
+    if(S.res){
+      st.classList.add(S.res.sucesso?'ok':'no');
+      st.textContent=S.res.sucesso?'Conseguiu!':'Não deu!';
+      $('resumoTempo').textContent='Tempo final: '+fmtT(S.res.seg)+' para '+nf.format(c.km)+' km (meta '+nf.format(c.min)+':00).';
+    }else{
+      $('resumoTempo').textContent='';
+    }
+
+    /* contas */
+    renderSettle();
+  }
+
+  function renderSettle(){
+    var box=$('settle'), nome=esc(S.cfg.nome);
+    if(!S.bets.length){box.innerHTML='<div class="empty">Sem apostas, sem contas.</div>';$('contasSub').textContent='';return}
+    if(!S.res){
+      var a=netCorredor(true), b=netCorredor(false);
+      $('contasSub').textContent='Prévia: o que acontece com o bolso do '+S.cfg.nome+' em cada cenário.';
+      box.innerHTML=
+        '<div class="line '+(a>0?'pay':'get')+'"><span>Se '+nome+' conseguir</span><b>'+(a>0?'paga ':'recebe ')+brl.format(Math.abs(a))+'</b></div>'+
+        '<div class="line '+(b>0?'pay':'get')+'"><span>Se '+nome+' falhar</span><b>'+(b>0?'paga ':'recebe ')+brl.format(Math.abs(b))+'</b></div>';
+      return;
+    }
+    $('contasSub').textContent='Resultado final. Quem deve pra quem.';
+    var rows=S.bets.map(function(bt){
+      var o=outcome(bt,S.res.sucesso);
+      return o.won
+        ? '<div class="line pay"><span>'+nome+' paga a <b>'+esc(bt.nome)+'</b></span><b>'+brl.format(o.val)+'</b></div>'
+        : '<div class="line get"><span><b>'+esc(bt.nome)+'</b> paga a '+nome+'</span><b>'+brl.format(o.val)+'</b></div>';
+    }).join('');
+    var n=netCorredor(S.res.sucesso);
+    rows+='<div class="total '+(n>0?'neg':'pos')+'"><span>Saldo do '+nome+'</span><span>'+(n>0?'-':'+')+brl.format(Math.abs(n))+'</span></div>';
+    box.innerHTML=rows;
+  }
+
+  function summaryText(){
+    var c=S.cfg, L=[];
+    L.push('🏃 BOLÃO DA CORRIDA');
+    L.push(c.nome+': '+nf.format(c.km)+' km em até '+nf.format(c.min)+' min, dia '+c.data.split('-').reverse().join('/'));
+    L.push('Odds: Confio paga '+nf.format(c.oddC)+' por 1 | Duvido paga '+nf.format(c.oddD)+' por 1');
+    L.push('');
+    S.bets.forEach(function(b){
+      L.push('- '+b.nome+': '+(b.lado==='confio'?'CONFIO':'DUVIDO')+' '+brl.format(b.valor));
+    });
+    L.push('');
+    if(S.res){
+      L.push('RESULTADO: '+fmtT(S.res.seg)+' ('+(S.res.sucesso?'CONSEGUIU':'NÃO CONSEGUIU')+')');
+      S.bets.forEach(function(b){
+        var o=outcome(b,S.res.sucesso);
+        L.push(o.won?('- '+c.nome+' paga '+brl.format(o.val)+' a '+b.nome):('- '+b.nome+' paga '+brl.format(o.val)+' a '+c.nome));
+      });
+      var n=netCorredor(S.res.sucesso);
+      L.push('Saldo do '+c.nome+': '+(n>0?'-':'+')+brl.format(Math.abs(n)));
+    }else{
+      L.push('Se conseguir, saldo do '+c.nome+': '+(netCorredor(true)>0?'-':'+')+brl.format(Math.abs(netCorredor(true))));
+      L.push('Se falhar, saldo do '+c.nome+': '+(netCorredor(false)>0?'-':'+')+brl.format(Math.abs(netCorredor(false))));
+    }
+    return L.join('\n');
+  }
+
+  /* eventos */
+  ['cNome','cKm','cMin','cData','cOddC','cOddD'].forEach(function(id){
+    $(id).addEventListener('input',function(){readCfg();save();render()});
+  });
+
+  $('betForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    if(S.res){$('copyMsg').textContent='A prova já foi registrada. Clique em "Reabrir apostas" para adicionar mais.';return}
+    var nome=$('bNome').value.trim(); var valor=parseFloat($('bValor').value);
+    var lado=document.querySelector('input[name=lado]:checked').value;
+    if(!nome||!(valor>0)) return;
+    S.bets.push({id:S.nextId++,nome:nome,lado:lado,valor:valor});
+    $('bNome').value=''; save(); render(); $('bNome').focus();
+  });
+
+  $('tickets').addEventListener('click',function(e){
+    var id=e.target.getAttribute&&e.target.getAttribute('data-del');
+    if(!id) return;
+    S.bets=S.bets.filter(function(b){return String(b.id)!==id});
+    save(); render();
+  });
+
+  $('btnRes').addEventListener('click',function(){
+    var m=parseInt($('rMin').value,10), s=parseInt($('rSeg').value,10)||0;
+    if(isNaN(m)||m<0||s<0||s>59){$('resumoTempo').textContent='Digite minutos e segundos válidos (segundos de 0 a 59).';return}
+    var seg=m*60+s;
+    S.res={seg:seg,sucesso:seg<=S.cfg.min*60};
+    save(); render();
+  });
+  $('btnReset').addEventListener('click',function(){S.res=null;save();render()});
+
+  $('btnCopy').addEventListener('click',function(){
+    var t=summaryText(), ta=$('copyArea');
+    ta.value=t; ta.classList.remove('hidden');
+    var done=function(){$('copyMsg').textContent='Resumo copiado. É só colar no grupo.'};
+    var fail=function(){ta.focus();ta.select();$('copyMsg').textContent='Não consegui copiar sozinho. Selecione o texto acima e copie.'};
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,fail)}else{fail()}
+    }catch(e){fail()}
+  });
+
+  var armed=false;
+  $('btnClear').addEventListener('click',function(){
+    var btn=$('btnClear');
+    if(!armed){armed=true;btn.textContent='Clique de novo para zerar';setTimeout(function(){armed=false;btn.textContent='Zerar tudo'},3500);return}
+    S=seed(); save(); fillCfg(); render(); armed=false; btn.textContent='Zerar tudo';
+    $('copyArea').classList.add('hidden'); $('copyMsg').textContent='';
+  });
+
+  fillCfg(); render();
+})();
+</script>
+</body>
+</html>
