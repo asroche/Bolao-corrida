@@ -115,6 +115,13 @@ input{background:var(--paper);border:2.5px solid var(--ink);border-radius:10px;p
 .fol .meter{flex:1;height:20px}
 .fol .meter i{transition:none}
 .fol .meter.low i{background:var(--track)}
+.meters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 16px}
+.fol .meter.belly i{background:#c08a4a}
+.fol .meter.urgent i{background:var(--track)}
+.fol .meter.urgent{animation:blink .6s steps(2) infinite}
+@keyframes blink{50%{background:#ffd9cf}}
+@media (prefers-reduced-motion:reduce){.fol .meter.urgent{animation:none}}
+@media (max-width:420px){.fol{font-size:11px;gap:6px}}
 .stage{position:relative;width:100%;aspect-ratio:16/9;border:3px solid var(--ink);border-radius:16px;overflow:hidden;box-shadow:6px 6px 0 var(--ink);background:#9fd3ff}
 @media (max-width:620px){.stage{aspect-ratio:6/5}}
 /* Celular deitado: jogo quase em tela cheia */
@@ -237,7 +244,10 @@ textarea{width:100%;min-height:130px;background:var(--paper);border:2.5px solid 
       <div class="stat"><small>Velocidade</small><b id="hVel">0 km/h</b></div>
       <div class="stat"><small>Ritmo meta</small><b id="hPace">-</b></div>
     </div>
-    <div class="fol"><span>Fôlego</span><div class="meter" id="folMeter"><i id="folBar" style="width:100%"></i></div><span id="folTxt">100%</span></div>
+    <div class="meters">
+      <div class="fol"><span>Fôlego</span><div class="meter" id="folMeter"><i id="folBar" style="width:100%"></i></div><span id="folTxt">100%</span></div>
+      <div class="fol"><span>Barriga</span><div class="meter belly" id="belMeter"><i id="belBar" style="width:0%"></i></div><span id="belTxt">0%</span></div>
+    </div>
     <div class="stage" id="stage"><canvas id="cv" aria-label="Jogo de corrida. Toque ou aperte espaço para pular."></canvas></div>
     <div class="row">
       <button class="btn ghost" type="button" id="btnPause">Pausar</button>
@@ -249,6 +259,8 @@ textarea{width:100%;min-height:130px;background:var(--paper);border:2.5px solid 
       <span>🧃 <b>Isotônico</b> devolve mais</span>
       <span>🚬 <b>Cigarro</b> dá turbo, mas depois vem a tosse</span>
       <span>🍪 <b>Cookies da Paula</b> dão energia, mas depois da corrida engordam</span>
+      <span>☕ <b>Café</b> dá energia e um gás, mas mexe com a barriga</span>
+      <span>🚻 <b>Barriga cheia (100%)</b>: ele para no próximo banheiro químico e perde 5 min</span>
     </div>
   </section>
 
@@ -285,6 +297,11 @@ var KEY='corre-cunhado-v1';
 var DAYS=30, GOAL_KM=5, LIMIT_MIN=45;
 var COOKIE_F=15, COOKIE_KG=0.4; /* cookie: +fôlego na hora, +kg depois da corrida */
 var MAX_DAYS=365;
+/* Barriga: cookie e café enchem; em 100 ele precisa do próximo banheiro químico.
+   Treino reduz o quanto enche (x1,3 sedentário até x0,5 atleta) e acelera a digestão. */
+var BELLY_COOKIE=30, BELLY_CAFE=25, CAFE_F=10, CAFE_BOOST=0.8, CAFE_TIME=4;
+var WC_POS=[900,1800,2700,3600,4400]; /* metros do percurso */
+var WC_MIN=5, WC_REAL=2.4;            /* 5 min no relógio da prova, 2,4 s de animação */
 var TS=15;            /* 1 s real = 15 s de prova */
 var AV_KM=1.6;        /* comprimento aproximado da avenida (numeração vai até ~1536) */
 var nf1=new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
@@ -469,7 +486,7 @@ function renderTreino(){
   var pp=prepOf(), ppct=Math.round(pp*100);
   $('prepTxt').textContent=ppct+'%'+(pp<0.25?' (sedentário)':(pp<0.6?' (pegando o ritmo)':(pp<0.9?' (em forma)':' (atleta)')));
   $('prepBar').style.width=ppct+'%';
-  $('prepHint').textContent='Na corrida: topada tira '+Math.round(16+10*(1-pp))+' de fôlego, água devolve '+Math.round(4+6*pp)+', isotônico '+Math.round(10+12*pp)+'. Com pouco preparo ele também pula mais baixo e a tosse do cigarro dura mais.';
+  $('prepHint').textContent='Na corrida: topada tira '+Math.round(16+10*(1-pp))+' de fôlego, água devolve '+Math.round(4+6*pp)+', isotônico '+Math.round(10+12*pp)+'. Com pouco preparo ele também pula mais baixo, a tosse do cigarro dura mais e cookie e café enchem a barriga mais rápido (cada um enche '+Math.round(BELLY_COOKIE*(1.3-0.8*pp))+'% e '+Math.round(BELLY_CAFE*(1.3-0.8*pp))+'%).';
   var c=Math.round(P.cansaco);
   $('cansTxt').textContent=c+'%'+(c>60?' (treino rende menos, e ele larga com menos fôlego)':(c>30?' (larga com um pouco menos de fôlego)':''));
   $('cansBar').style.width=c+'%';
@@ -596,7 +613,9 @@ var Race={
     this.obs=[]; this.items=[]; this.fx=[];
     this.nextObs=520; this.nextItem=380;
     this.turbo=0; this.cough=0;
-    this.stat={agua:0,iso:0,cig:0,hit:0,cookie:0};
+    this.stat={agua:0,iso:0,cig:0,hit:0,cookie:0,cafe:0,wc:0};
+    this.belly=0; this.urgent=false; this.cafe=0; this.wc=0; this.wcAdd=0; this.wcAt=-1; this.prevU=0;
+    this.bellyMul=1.3-0.8*this.prep; this.bellyDecay=0.3+0.6*this.prep;
     this.result=null; this.hudT=0;
     this.npcs=[spawnNpc(this,true),spawnNpc(this,true)]; this.cars=[]; this.npcT=1.5; this.carT=0.4;
   },
@@ -614,9 +633,10 @@ var Race={
   loop:function(){
     var self=this; cancelAnimationFrame(this.raf);
     this.raf=requestAnimationFrame(function f(t){
-      if(self.state!=='run'&&self.state!=='end'){self.raf=0;return}
+      if(self.state!=='run'&&self.state!=='end'&&self.state!=='wc'){self.raf=0;return}
       var dt=self.last?Math.min(0.05,(t-self.last)/1000):0; self.last=t;
       if(self.state==='run')self.update(dt);
+      else if(self.state==='wc')self.updateWc(dt);
       else self.updateEnd(dt);
       self.draw();
       self.raf=requestAnimationFrame(f);
@@ -638,7 +658,38 @@ var Race={
     if(this.stumble>0)v*=0.55;
     if(this.turbo>0)v+=this.turboBoost;
     if(this.cough>0)v-=0.6;
+    if(this.cafe>0)v+=CAFE_BOOST;
+    if(this.urgent)v*=0.8;
     return Math.max(2,v);
+  },
+  nextWc:function(){
+    var u=this.dist*1000;
+    for(var i=0;i<WC_POS.length;i++)if(WC_POS[i]>u)return WC_POS[i];
+    return -1;
+  },
+  addBelly:function(amount){
+    if(this.urgent)return;
+    this.belly=Math.min(100,this.belly+amount*this.bellyMul);
+    if(this.belly>=100){
+      this.urgent=true;
+      var p=this.pl;
+      this.fx.push({x:p.x+p.w/2,y:p.y-40,txt:'DOR DE BARRIGA!',life:1.4,color:'#8a4a1c'});
+      if(this.nextWc()<0)this.fx.push({x:p.x+p.w/2+40,y:p.y-62,txt:'Sem banheiro... segura!',life:1.6,color:'#e8431f',small:true});
+    }
+  },
+  updateWc:function(dt){
+    var i,o;
+    this.wc-=dt;
+    var add=Math.min(this.wcAdd,WC_MIN*60*dt/WC_REAL); this.t+=add; this.wcAdd-=add;
+    updateNpcs(this,dt,0); updateCars(this,dt,0);
+    for(i=this.fx.length-1;i>=0;i--){o=this.fx[i];o.life-=dt;o.y-=30*dt;if(o.life<=0)this.fx.splice(i,1)}
+    if(this.wc<=0){
+      this.t+=this.wcAdd; this.wcAdd=0;
+      this.belly=0; this.urgent=false; this.wcAt=-1;
+      this.state='run'; this.pl.inv=0.8;
+      this.fx.push({x:this.pl.x+this.pl.w/2,y:this.pl.y-20,txt:'Aliviado!',life:1.2,color:'#1c8a3c'});
+    }
+    this.updateHud(false,dt);
   },
   update:function(dt){
     var p=this.pl;
@@ -646,14 +697,32 @@ var Race={
     p.inv=Math.max(0,p.inv-dt);
     if(this.turbo>0){this.turbo-=dt;if(this.turbo<=0){this.turbo=0;this.cough=this.coughDur;this.fx.push({x:p.x+20,y:p.y-10,txt:'cof cof!',life:1.2})}}
     else if(this.cough>0)this.cough=Math.max(0,this.cough-dt);
+    if(this.cafe>0)this.cafe=Math.max(0,this.cafe-dt);
+    if(!this.urgent)this.belly=Math.max(0,this.belly-this.bellyDecay*dt);
     var v=this.speed();
     var px=v*48*dt;
     this.worldX+=px;
     this.t+=dt*TS;
     this.dist+=v/3600*dt*TS;
-    var drain=drainPerMin(v,this.prep)*(this.cough>0?2.5+0.8*(1-this.prep):1);
+    var drain=drainPerMin(v,this.prep)*(this.cough>0?2.5+0.8*(1-this.prep):1)*(this.urgent?1.2:1);
     this.f-=drain*dt*TS/60;
     p.phase+=dt*v*1.6;
+
+    /* banheiro químico: apertado, para no próximo que cruzar */
+    var uNow=this.dist*1000;
+    if(this.urgent){
+      for(var wi=0;wi<WC_POS.length;wi++){
+        if(this.prevU<WC_POS[wi]&&uNow>=WC_POS[wi]&&WC_POS[wi]<GOAL_KM*1000){
+          this.dist=WC_POS[wi]/1000; this.prevU=WC_POS[wi];
+          this.state='wc'; this.wc=WC_REAL; this.wcAdd=WC_MIN*60; this.wcAt=WC_POS[wi]; this.stat.wc++;
+          p.y=GY-p.h; p.vy=0; p.ground=true; p.jumps=0; this.turbo=0; this.cafe=0;
+          this.fx.push({x:W/2,y:H/2+20,txt:'+'+WC_MIN+':00 NO RELÓGIO',life:WC_REAL+0.3,color:'#e8431f'});
+          this.updateHud(true);
+          return;
+        }
+      }
+    }
+    this.prevU=uNow;
 
     /* física */
     if(!p.ground){
@@ -701,7 +770,8 @@ var Race={
         this.items.splice(i,1);
         if(o.type==='agua'){var ga=Math.round(4+6*this.prep);this.f=Math.min(this.maxF,this.f+ga);this.stat.agua++;this.fx.push({x:o.x,y:o.y,txt:'+'+ga+' fôlego',life:0.9,color:'#2f6bff'})}
         else if(o.type==='iso'){var gi=Math.round(10+12*this.prep);this.f=Math.min(this.maxF,this.f+gi);this.stat.iso++;this.fx.push({x:o.x,y:o.y,txt:'+'+gi+' fôlego',life:0.9,color:'#1c8a3c'})}
-        else if(o.type==='cookie'){this.f=Math.min(this.maxF,this.f+COOKIE_F);this.stat.cookie++;this.fx.push({x:o.x,y:o.y,txt:'COOKIES DA PAULA! +'+COOKIE_F,life:1.1,color:'#8a4a1c'})}
+        else if(o.type==='cookie'){this.f=Math.min(this.maxF,this.f+COOKIE_F);this.stat.cookie++;this.fx.push({x:o.x,y:o.y,txt:'COOKIES DA PAULA! +'+COOKIE_F,life:1.1,color:'#8a4a1c'});this.addBelly(BELLY_COOKIE)}
+        else if(o.type==='cafe'){this.f=Math.min(this.maxF,this.f+CAFE_F);this.cafe=CAFE_TIME;this.stat.cafe++;this.fx.push({x:o.x,y:o.y,txt:'CAFÉ! +'+CAFE_F,life:1,color:'#6b3a1c'});this.addBelly(BELLY_CAFE)}
         else {this.turbo=2+this.prep;this.cough=0;this.stat.cig++;this.fx.push({x:o.x,y:o.y,txt:'TURBO!',life:0.9,color:'#e8431f'})}
       }
     }
@@ -737,9 +807,9 @@ var Race={
     this.obs.push(o);
   },
   spawnItem:function(){
-    var r=Math.random(), t=r<0.42?'agua':(r<0.66?'cig':(r<0.8?'iso':'cookie'));
+    var r=Math.random(), t=r<0.36?'agua':(r<0.56?'cig':(r<0.68?'iso':(r<0.84?'cookie':'cafe')));
     var high=Math.random()<0.45;
-    var o={type:t,w:t==='cig'?30:(t==='cookie'?24:20),h:t==='cig'?14:(t==='cookie'?24:30),x:W+40};
+    var o={type:t,w:t==='cig'?30:(t==='cookie'?24:(t==='cafe'?22:20)),h:t==='cig'?14:(t==='cookie'?24:(t==='cafe'?24:30)),x:W+40};
     o.y=high?GY-145:GY-o.h-14;
     for(var i=0;i<this.obs.length;i++){
       if(Math.abs(this.obs[i].x-o.x)<110){o.x=this.obs[i].x+150}
@@ -775,6 +845,10 @@ var Race={
     $('folBar').style.width=pct+'%';
     $('folTxt').textContent=Math.round(pct)+'%';
     $('folMeter').classList.toggle('low',pct<20);
+    var bp=clamp(this.belly||0,0,100);
+    $('belBar').style.width=bp+'%';
+    $('belTxt').textContent=this.urgent?'APERTADO':Math.round(bp)+'%';
+    $('belMeter').classList.toggle('urgent',!!this.urgent);
   },
 
   /* ---------- desenho ---------- */
@@ -825,6 +899,7 @@ function drawWorld(c,R){
 
   /* névoa leve: joga o cenário pra trás e destaca a pista */
   c.fillStyle='rgba(255,246,228,.34)'; c.fillRect(0,0,W,GY);
+  drawWCs(c,R);
   /* calçada e rua */
   c.fillStyle='#ece2cf'; c.fillRect(0,GY,W,17.5);
   c.fillStyle='#d6c9b0';
@@ -839,7 +914,7 @@ function drawWorld(c,R){
 
   for(i=0;i<R.items.length;i++)drawItem(c,R.items[i]);
   for(i=0;i<R.obs.length;i++)drawObs(c,R.obs[i]);
-  drawRunner(c,R.pl,R);
+  if(R.state!=='wc')drawRunner(c,R.pl,R);
   for(i=0;i<R.fx.length;i++){
     var f=R.fx[i]; if(!f.ring)continue;
     c.fillStyle='rgba(255,255,255,'+clamp(f.life*3,0,1)+')';
@@ -1262,13 +1337,32 @@ function drawLabels(c,R){
   c.fillStyle='#1c6b3a'; c.fillRect(12,12,tw,26);
   c.strokeStyle='#fff'; c.lineWidth=2; c.strokeRect(15,15,tw-6,20);
   c.textAlign='left'; pixText(c,label,24,25.5,8,'#fff',null,tw-20);
-  if(R.turbo>0||R.cough>0){
-    var tl=R.turbo>0?'TURBO!':'TOSSINDO...';
-    c.font='9px '+PIX;
-    var w2=c.measureText(tl).width+20;
-    c.fillStyle='#16120e'; c.fillRect(10,44,w2+4,26);
-    c.fillStyle=R.turbo>0?'#e8431f':'#6e6253'; c.fillRect(12,46,w2,22);
-    pixText(c,tl,22,57.5,9,'#fff',null);
+  /* plaquinha WC em cada banheiro */
+  for(var wi=0;wi<WC_POS.length;wi++){
+    var wxp=wcX(R,WC_POS[wi]); if(wxp<-40||wxp>W+40)continue;
+    c.textAlign='center'; pixText(c,'WC',wxp,GY-67,6,'#16120e',null);
+  }
+  /* selos de estado (empilhados) */
+  var badges=[];
+  if(R.turbo>0)badges.push(['TURBO!','#e8431f']);
+  else if(R.cough>0)badges.push(['TOSSINDO...','#6e6253']);
+  if(R.cafe>0)badges.push(['CAFÉ: GÁS EXTRA','#6b3a1c']);
+  if(R.urgent&&R.state!=='wc'){
+    var nw=R.nextWc();
+    badges.push([nw<0?'APERTADO! SEM BANHEIRO À FRENTE':'APERTADO! BANHEIRO EM '+Math.max(0,Math.round(nw-R.dist*1000))+' M','#8a4a1c']);
+  }
+  c.font='9px '+PIX; c.textAlign='left';
+  for(var bi=0;bi<badges.length;bi++){
+    var by=44+bi*30, w2=Math.min(W-24,c.measureText(badges[bi][0]).width+20);
+    c.fillStyle='#16120e'; c.fillRect(10,by,w2+4,26);
+    c.fillStyle=badges[bi][1]; c.fillRect(12,by+2,w2,22);
+    pixText(c,badges[bi][0],22,by+13.5,9,'#fff',null,w2-16);
+  }
+  if(R.state==='wc'){
+    c.fillStyle='rgba(22,18,14,.35)'; c.fillRect(0,0,W,H);
+    c.textAlign='center';
+    pixText(c,'FOI AO BANHEIRO...',W/2,H/2-40,14,'#fff','#16120e',W-40);
+    pixText(c,'O RELÓGIO NÃO PARA',W/2,H/2-16,8,'#ffd34d','#16120e',W-40);
   }
   if(R.state==='ready'||R.state==='pause'){
     c.fillStyle='rgba(22,18,14,.6)'; c.fillRect(0,0,W,H);
@@ -1280,6 +1374,26 @@ function drawLabels(c,R){
     }else{
       pixText(c,'TOQUE PRA CONTINUAR',W/2,H/2+10,9,'#fff',null,W-40);
     }
+  }
+}
+
+/* Banheiros químicos: ficam na calçada, no mesmo plano da pista */
+function wcX(R,b){return PX0+(b-R.dist*1000)*PPM_G}
+function drawWCs(c,R){
+  for(var i=0;i<WC_POS.length;i++){
+    var x=wcX(R,WC_POS[i]); if(x<-40||x>W+40)continue;
+    var busy=R.state==='wc'&&R.wcAt===WC_POS[i];
+    var sh=busy?(Math.floor(R.wc*20)%2?2.5:-2.5):0;
+    var bx=sn(x-17.5+sh), base=GY-2.5;
+    c.fillStyle='#16120e'; c.fillRect(bx-2.5,base-72.5,40,72.5);
+    c.fillStyle='#1b2550'; c.fillRect(bx-2.5,base-77.5,40,7.5);
+    c.fillStyle='#2f6bff'; c.fillRect(bx,base-70,35,70);
+    c.fillStyle='#5a8bff'; c.fillRect(bx+2.5,base-67.5,5,62.5);
+    c.fillStyle='#16120e'; c.fillRect(bx+5,base-60,25,60);
+    c.fillStyle='#4a78f0'; c.fillRect(bx+7.5,base-57.5,20,57.5);
+    c.fillStyle='#16120e'; c.fillRect(bx+10,base-52.5,15,2.5); c.fillRect(bx+10,base-47.5,15,2.5);
+    c.fillStyle=busy?'#e8431f':'#1c8a3c'; c.fillRect(bx+22.5,base-35,5,5);
+    c.fillStyle='#f4f4f4'; c.fillRect(bx+10,base-67.5,15,5);
   }
 }
 
@@ -1399,7 +1513,15 @@ function drawItem(c,o){
   c.save(); c.lineWidth=2.5; c.strokeStyle='#16120e';
   var bob=Math.sin((o.anim||0)*5)*3, x=o.x, y=o.y+bob;
   c.fillStyle='rgba(255,236,120,.6)'; c.beginPath(); c.arc(x+o.w/2,y+o.h/2,17.5,0,Math.PI*2); c.fill();
-  if(o.type==='cookie'){
+  if(o.type==='cafe'){
+    var qx=sn(x), qy=sn(y);
+    c.fillStyle='#16120e'; c.fillRect(qx-2.5,qy+2.5,22.5,22.5); c.fillRect(qx+17.5,qy+7.5,7.5,10);
+    c.fillStyle='#fff'; c.fillRect(qx,qy+5,17.5,17.5); c.fillRect(qx+17.5,qy+10,2.5,5);
+    c.fillStyle='#6b3a1c'; c.fillRect(qx+2.5,qy+5,12.5,5);
+    c.fillStyle='#e8431f'; c.fillRect(qx,qy+15,17.5,2.5);
+    var st=Math.floor((o.anim||0)*6)%2;
+    c.fillStyle='rgba(230,230,230,.9)'; c.fillRect(qx+5+st*2.5,qy-5,2.5,5); c.fillRect(qx+10-st*2.5,qy-7.5,2.5,5);
+  }else if(o.type==='cookie'){
     var cx=sn(x+o.w/2), cy=sn(y+o.h/2);
     c.fillStyle='#16120e'; c.beginPath(); c.arc(cx,cy,13,0,Math.PI*2); c.fill();
     c.fillStyle='#d9a05b'; c.beginPath(); c.arc(cx,cy,10.5,0,Math.PI*2); c.fill();
@@ -1462,12 +1584,14 @@ function showResult(r,s){
     P.pesoAtual=Math.min(250,P.pesoAtual+kg); store();
     txt+=' Comeu '+s.cookie+(s.cookie===1?' cookie':' cookies')+' da Paula: <b>+'+nf1.format(kg)+' kg</b>. Agora tem que treinar pra queimar o açúcar.';
   }
+  if(s.wc>0)txt+=' Foi '+s.wc+'x ao banheiro químico: <b>+'+(s.wc*WC_MIN)+' min</b> no relógio.';
   $('fTxt').innerHTML=txt;
   $('fStats').innerHTML=
     '<div class="stat"><small>Distância</small><b>'+nf2.format(r.dist)+' km</b></div>'+
     '<div class="stat"><small>Tempo</small><b>'+fmtClock(r.t)+'</b></div>'+
     '<div class="stat"><small>Ritmo médio</small><b>'+fmtPace(pace)+'</b></div>'+
-    '<div class="stat"><small>Água · Cigarro · Cookie · Topadas</small><b>'+(s.agua+s.iso)+' · '+s.cig+' · '+s.cookie+' · '+s.hit+'</b></div>';
+    '<div class="stat"><small>Água · Cigarro · Cookie · Café</small><b>'+(s.agua+s.iso)+' · '+s.cig+' · '+s.cookie+' · '+s.cafe+'</b></div>'+
+    '<div class="stat"><small>Topadas · Banheiro</small><b>'+s.hit+' · '+s.wc+'x (+'+(s.wc*WC_MIN)+' min)</b></div>';
   var best=P.recorde;
   if(!best||r.dist>best.dist||(r.reached&&best.reached&&r.t<best.t)){P.recorde={dist:r.dist,t:r.t,reached:r.reached};store()}
   lastResultText=
@@ -1475,7 +1599,8 @@ function showResult(r,s){
     P.nome+': '+(r.ok?'CONSEGUIU':'NÃO CONSEGUIU')+'\n'+
     'Distância: '+nf2.format(r.dist)+' km em '+fmtClock(r.t)+(r.dist>0?' ('+fmtPace(pace)+')':'')+'\n'+
     'Treinou '+(P.dia-1)+' dias'+(extra?' (treino extra, NÃO VALE pra aposta)':'')+'\n'+
-    'Água: '+(s.agua+s.iso)+' · Cigarros: '+s.cig+' · Cookies da Paula: '+s.cookie+(kg?' (+'+nf1.format(kg)+' kg)':'')+' · Topadas: '+s.hit;
+    'Água: '+(s.agua+s.iso)+' · Cigarros: '+s.cig+' · Cookies da Paula: '+s.cookie+(kg?' (+'+nf1.format(kg)+' kg)':'')+' · Cafés: '+s.cafe+' · Topadas: '+s.hit+
+    (s.wc?'\nBanheiro químico: '+s.wc+'x (+'+(s.wc*WC_MIN)+' min)':'');
   $('copyArea').classList.add('hidden'); $('copyMsg').textContent='';
   $('btnBackTrain').textContent='Voltar pro treino';
   show('sFim');
